@@ -1,4 +1,5 @@
 
+# bloody dependencies
 import dash
 from dash.dependencies import Input, Output
 import dash_core_components as dcc
@@ -47,7 +48,7 @@ def graphRMSE():
             text = books['title'],
             mode = 'markers'
         )
-        for col,label in {'RMSE_heaps':'Heap\'s Law','RMSE_taylor':'Taylor Series','RMSE_model':'Logarithmic Model'}.items()
+        for col,label in {'RMSE_heaps':'Heap\'s Law','RMSE_iseries':'Infinite Series','RMSE_model':'Logarithmic Model'}.items()
     ]
     layout = go.Layout(
         title = 'Root Mean Square Error (% of Types)',
@@ -60,18 +61,22 @@ def graphRMSE():
 # Show plots in dashboard
 app = dash.Dash()
 
-app.layout = html.Div(children = [
-    dcc.Graph(id = 'figData', figure = graphData()), # actual vs. optimum types by corpus size
-    dcc.Graph(id = 'figRMSE', figure = graphRMSE()), # RMSE by corpus size
-    dcc.Dropdown(
-        id = 'book-selector',
-        options = [
-            { 'label': '{}: {}'.format(books.loc[key]['author'], books.loc[key]['title']), 'value': key } for key in books.index
-        ],
-        value = 2701 # default to Moby Dick
-    ),
-    dcc.Graph(id = 'figTTR'), # TTR Curve
-    dcc.Graph(id = 'figLego') # Hapax & n-legomena proportions
+app.layout = html.Div([
+    html.Div([
+        dcc.Dropdown(
+            id = 'book-selector',
+            options = [
+                { 'label': '{} ({},{})'.format(books.loc[key]['title'], books.loc[key]['tokens'], books.loc[key]['types']), 'value': key } for key in books.index
+            ],
+            value = books.index[0]
+        ),
+        dcc.Graph(id = 'figTTR'), # TTR Curve
+        dcc.Graph(id = 'figLego') # Hapax & n-legomena proportions
+    ], style = dict(width = '50%', display = 'inline-block')),
+    html.Div([
+        dcc.Graph(id = 'figData', figure = graphData()), # actual vs. optimum types by corpus size
+        dcc.Graph(id = 'figRMSE', figure = graphRMSE()), # RMSE by corpus size
+    ], style = dict(width = '50%', display = 'inline-block'))
 ])
 
 # Fig TTR: Actual vs Predicted types = f(tokens)
@@ -79,10 +84,11 @@ app.layout = html.Div(children = [
     Output('figTTR', 'figure'),
     [ Input('book-selector', 'value') ]
 )
-def graph1(bookid):
+def graphTTR(bookid):
     df = ttr[ttr['bookid'] == bookid]
     title = books.loc[bookid]['title']
     Mz    = books.loc[bookid]['Mz']
+    Nz    = books.loc[bookid]['Nz']
     data = [
         go.Scatter(
         x = df['tokens'],
@@ -92,7 +98,7 @@ def graph1(bookid):
     ) for colname,displayname in {
         'types': 'Types Observed',
         'types_pred_heaps': 'Types Predicted (Heap\'s Law)',
-        'types_pred_taylor': 'Types Predicted (Taylor Series)',
+        'types_pred_iseries': 'Types Predicted (Infinite Series)',
         'types_pred_model': 'Types Predicted (Logarithmic Model)',
         'hapax': 'Hapaxes Observed',
         'hapax_pred_model': 'Hapaxes Predicted',
@@ -106,7 +112,7 @@ def graph1(bookid):
         'pentakis_pred_model': 'Pentakis Predicted'
     }.items()]
     layout = go.Layout(
-        title = 'Type-Token Ratio for {} (Mz={})'.format(title, Mz),
+        title = 'Type-Token Ratio for {} -- Optimum=({},{})'.format(title, Mz, Nz),
         xaxis = dict(title = 'Tokens'),
         yaxis = dict(title = 'Types')
     )
@@ -141,7 +147,7 @@ def graphLego(bookid):
     layout = go.Layout(
         title = 'Legomena Proportions for {}'.format(title),
         xaxis = dict(title = 'Tokens'),
-        yaxis = dict(title = 'Fraction of Types')
+        yaxis = dict(title = 'Fraction of Types', tickformat = ',.0%')
     )
     fig = {'data': data, 'layout': layout}
     return fig

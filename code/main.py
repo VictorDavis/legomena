@@ -2,129 +2,123 @@
 # bloody dependencies
 import collections
 import math
+from nltk.corpus import gutenberg # not actually doing any real nlp, just using corpora
 import numpy as np
+import os
 import pandas as pd
 import random
 import re
 
-# Converts Project Gutenberg text into "bag of words"
-# To test for "clean" text: set(filter(re.compile('[^a-z0-9\']').match, words))
-def getWordBag(bookid):
-    books = pd.read_csv('data/books.csv', index_col = 0)
-    book = books.loc[bookid]
-    file = open('books/'+book.filename)
-    lines = file.readlines()
-    lim = [lines.index(line) for line in lines if 'PROJECT GUTENBERG EBOOK' in line]
-    start = lim[0]+1
-    end = lim[1]-1
-    text = ''.join(lines[start:end])
+# Project Gutenberg does not allow programmatic "pinging" of site pages, so for the sake of transparency and reproducibility,
+# using nltk's built-in corpora and wordstrings with no "manual" preprocessing
+def getWordBagFromNLTK(filename):
+    words = list(gutenberg.words(filename))
+    meta = [ words.index(bracket) for bracket in ['[', ']'] ]
+    meta = ' '.join(words[(meta[0]+1):meta[1]])
+    return (words, meta)
 
-    # break out paragraphs
-    text = re.sub('\n\n', '<para>', text)
-    text = re.sub('\n', ' ', text)
-    para = text.split('<para>')
-    para = [para for para in para if re.search('[.?!:",-]$', para)] # require paragraphs to end with puncuation
-    # remove all footnotes & meaningless punctuation: colons, semicolons, em-dashes
-    para = [re.sub('\[[0-9]+\]',' ',para) for para in para]
-    para = [re.sub(',|"|“|”|\*|;|--|—|\(|\)|:|\_|~',' ',para) for para in para]
-    text = ' <para> '.join(para)
+# # Converts Project Gutenberg text into "bag of words"
+# # Reads from manually downloaded file, includes preprocessing
+# # To test for "clean" text: set(filter(re.compile('[^a-z0-9\']').match, words))
+# def getWordBag(filename):
+#     # books = pd.read_csv('data/books.csv', index_col = 0)
+#     # book = books.loc[bookid]
+#     with open('books/'+filename) as file:
+#         lines = file.readlines()
+#     lim = [ lines.index(line) for line in lines if 'PROJECT GUTENBERG EBOOK' in line ]
+#     start = lim[0]+1
+#     end = lim[1]-1
+#     text = ''.join(lines[start:end])
+#
+#     # meta-data from gutenberg header
+#     bookid  = [ re.compile('\[EBook #([0-9]+)\]').findall(line)[0] for line in lines[0:start] if '[EBook #' in line ]
+#     title   = [ re.compile('Title: (.*)'        ).findall(line)[0] for line in lines[0:start] if 'Title: '  in line ]
+#     author  = [ re.compile('Author: (.*)'       ).findall(line)[0] for line in lines[0:start] if 'Author: ' in line ]
+#     # release = [ re.compile('Release Date: (.*)').findall(line)[0] for line in lines[0:start] if 'Release Date: ' in line ][0]
+#     bookid = bookid[0].strip() if len(bookid) > 0 else ''
+#     title  = title[0].strip() if len(title) > 0 else ''
+#     author = author[0].strip() if len(author) > 0 else ''
+#     if author != '':
+#         title += ' by '+author
+#
+#     # break out paragraphs
+#     text = re.sub('\n\n', '<para>', text)
+#     text = re.sub('\n', ' ', text)
+#     para = text.split('<para>')
+#     para = [para for para in para if re.search('[.?!:",-]$', para)] # require paragraphs to end with puncuation
+#     # remove all footnotes & meaningless punctuation: colons, semicolons, em-dashes
+#     para = [re.sub('\[[0-9]+\]',' ',para) for para in para]
+#     para = [re.sub(',|"|“|”|\*|;|--|—|\(|\)|:|\_|~',' ',para) for para in para]
+#     text = ' <para> '.join(para)
+#
+#     # break out sentences (credit: https://regex101.com/r/nG1gU7/27)
+#     line = re.split('(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s', text)
+#     line = [re.sub('\.$',' <stop>', line) for line in line]
+#     line = [re.sub('\?$',' <question>', line) for line in line]
+#     line = [re.sub('\!$',' <exclamation>', line) for line in line]
+#     text = ' '.join(line)
+#
+#     # break out words
+#     word = [word.lower() for word in text.split(' ') if len(word) > 0]
+#     text = ' '.join(word)
+#
+#     # return results
+#     return (word, bookid, title)
 
-    # break out sentences (credit: https://regex101.com/r/nG1gU7/27)
-    line = re.split('(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s', text)
-    line = [re.sub('\.$',' <stop>', line) for line in line]
-    line = [re.sub('\?$',' <question>', line) for line in line]
-    line = [re.sub('\!$',' <exclamation>', line) for line in line]
-    text = ' '.join(line)
+# # Fits hapax_frac data to 1/ln(x)+1/(1-x)
+# def findOptimum(ttr):
+#     M = ttr['tokens'].max()
+#     N = ttr['types'].max()
+#     Mz = M+1
+#     dM = M/2
+#     timer = 1
+#     realY = ttr['hapax_frac']
+#     lastError = 1
+#     while (math.fabs(dM) > 100) & (timer < 999):
+#         X = ttr['tokens'] / Mz
+#         predY = [ 1/math.log(x)+1/(1-x) for x in X ]
+#         totalError = sum((predY - realY)**2)
+#         if totalError <= lastError:
+#             while Mz - dM < 0:
+#                 dM = int(dM/2)
+#         else:
+#             dM = -int(dM/2)
+#         Mz = Mz + dM
+#         lastError = totalError
+#         print('Mz = {}, dM = {}, Err = {}'.format(Mz, dM, totalError))
+#         timer += 1
+#     z = Mz/M
+#     if (Mz > M): # forecast Nz
+#         Nz = int(N * math.log(z) * z / (z-1))
+#     else:
+#         # lookup nearest approximate value for Nz
+#         dM = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
+#         idx = dM.idxmin()
+#         Nz = ttr.loc[idx]['types']
+#     return (z, Mz, Nz)
 
-    # break out words
-    word = [word.lower() for word in text.split(' ') if len(word) > 0]
-    text = ' '.join(word)
-
-    # return results
-    return word
-
-# Fits hapax_frac data to 1/ln(x)+1/(1-x)
-def findOptimum(ttr):
-    M = ttr['tokens'].max()
-    N = ttr['types'].max()
-    Mz = M+1
-    dM = M/2
-    timer = 1
-    realY = ttr['hapax_frac']
-    lastError = 1
-    while (math.fabs(dM) > 100) & (timer < 999):
-        X = ttr['tokens'] / Mz
-        predY = [ 1/math.log(x)+1/(1-x) for x in X ]
-        totalError = sum((predY - realY)**2)
-        if totalError <= lastError:
-            while Mz - dM < 0:
-                dM = int(dM/2)
-        else:
-            dM = -int(dM/2)
-        Mz = Mz + dM
-        lastError = totalError
-        print('Mz = {}, dM = {}, Err = {}'.format(Mz, dM, totalError))
-        timer += 1
-    z = Mz/M
-    if (Mz > M): # forecast Nz
-        Nz = int(N * math.log(z) * z / (z-1))
-    else:
-        # lookup nearest approximate value for Nz
-        ttr['dM'] = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
-        id = ttr['dM'].idxmin()
-        Nz = ttr.loc[id]['types']
-    return (z, Mz, Nz)
-
-# Predicts number of types based on input (n) and free parameters (Mz,Nz)
-def modelValues(n, Mz, Nz):
-    x = n/Mz
-    if (math.fabs(x-1) < .01): # discontinuity @ n=M
+# Predicts number of types based on input (m) and free parameters (Mz,Nz)
+def modelValues(m, Mz, Nz):
+    x = m/Mz
+    if (math.fabs(x-1) < .01): # discontinuity @ m=M
         types = Nz
-        hapax = int(Nz/2)
-        dis = int(Nz/6)
-        tris = int(Nz/12)
-        tetrakis = int(Nz/20)
-        pentakis = int(Nz/30)
+        hapax = Nz/2
+        dis = Nz/6
+        tris = Nz/12
+        tetrakis = Nz/20
+        pentakis = Nz/30
     else:
         logx = math.log(x)
-        types = int(Nz*logx*x/(x-1))
-        hapax = int(Nz*(x**2 - logx*x - x)/(x-1)**2)
-        dis = int(Nz*(x**3 - 2*logx*x**2 - x)/2/(x-1)**3)
-        tris = int(Nz*(2*x**4 - 6*logx*x**3 + 3*x**3 - 6*x**2 + x)/6/(1-x)**4)
-        tetrakis = int(Nz*(3*x**5 - 12*logx*x**4 + 10*x**4 - 18*x**3 + 6*x**2 - x)/12/(x-1)**5)
-        pentakis = int(Nz*(12*x**6 - 60*logx*x**5 + 65*x**5 - 120*x**4 + 60*x**3 - 20*x**2 + 3*x)/60/(x-1)**6)
+        types = Nz*logx*x/(x-1)
+        hapax = Nz*(x**2 - logx*x - x)/(x-1)**2
+        dis = Nz*(x**3 - 2*logx*x**2 - x)/2/(x-1)**3
+        tris = Nz*(2*x**4 - 6*logx*x**3 + 3*x**3 - 6*x**2 + x)/6/(x-1)**4
+        tetrakis = Nz*(3*x**5 - 12*logx*x**4 + 10*x**4 - 18*x**3 + 6*x**2 - x)/12/(x-1)**5
+        pentakis = Nz*(12*x**6 - 60*logx*x**5 + 65*x**5 - 120*x**4 + 60*x**3 - 20*x**2 + 3*x)/60/(x-1)**6
     return (types, hapax, dis, tris, tetrakis, pentakis)
 
-# # Fit parameter z to TTR data
-# # TODO: use RMSE instead
-# def fitModel(M, N, xvals, yvals):
-#     z = 1
-#     dk = .5
-#     area_correct = sum(yvals)
-#     last_error = 1
-#     timer = 1
-#     while (dk > .0001) & (timer < 999):
-#         area_prediction = sum([modelValues(n, M, N, z)[0] for n in xvals])
-#         error = area_prediction - area_correct
-#         if error == 0:
-#             return z
-#         print('z = {}, error = {}, dk = {}'.format(z, error, dk))
-#         if (last_error > 0) & (error > 0):
-#             z = z + dk
-#         if (last_error < 0) & (error < 0):
-#             z = z - dk
-#         if (last_error > 0) & (error < 0):
-#             dk = dk / 2
-#             z = z + dk
-#         if (last_error < 0) & (error > 0):
-#             dk = dk / 2
-#             z = z - dk
-#         last_error = error
-#         timer += 1
-#     return z
-
 # At what point do the n-legomena most closely resemble a perfect Zipf Distribution?
-# When 1/ln(x)+1/(x-1) = H for H the observed proportion of hapaxes
+# When 1/ln(x)+1/(1-x) = H for H the observed proportion of hapaxes
 # Note: Because of the nature of this function, Newton's Method is not ideal.
 #       Instead, we use a binary search to find f(x)-H = 0, which
 #       works nicely since f(x) decreases monotonically from 0 to inf
@@ -160,7 +154,7 @@ def solveForX(H):
     return x
 
 
-# Type-Token Curve for varying corpus lengths (measured/observed)
+# Type-Token Curve for varying corpus lengths (empirically measured/observed)
 def getTTRCurve(decks):
     df = []
     for tokens in decks['tokens'].unique():
@@ -177,53 +171,25 @@ def calcRMSE(df):
     n = df.shape[0]
     N = df['types'].max()
     heaps  = math.sqrt(sum([ (row['types'] - row['types_pred_heaps'] )**2 for index,row in df.iterrows() ])/n)/N
-    taylor = math.sqrt(sum([ (row['types'] - row['types_pred_taylor'])**2 for index,row in df.iterrows() ])/n)/N
+    iseries = math.sqrt(sum([ (row['types'] - row['types_pred_iseries'])**2 for index,row in df.iterrows() ])/n)/N
     model  = math.sqrt(sum([ (row['types'] - row['types_pred_model'] )**2 for index,row in df.iterrows() ])/n)/N
-    return [heaps, taylor, model]
-
-# Calculate distance from the predicted optimum "closure of speech" M ~ N(γ+ln(N))
-def calcOffClosure(Mz, Nz):
-    minOC = -1
-    γ = 0.5772156649
-    for N in range(int(.5*Nz), int(1.5*Nz), int(.001*Nz)):
-        M = N*(γ+math.log(N))
-        OC = (Mz-M)**2+(Nz-N)**2
-        if (minOC < 0) | (OC < minOC):
-            minOC = OC
-    return int(math.sqrt(minOC))
+    return [heaps, iseries, model]
 
 # Heap's Law estimate
 def predictHeaps(df):
+    df = pd.DataFrame(df) # redeclare
     df['logM'] = [ math.log(M) for M in df['tokens']]
     df['logN'] = [ math.log(N) for N in df['types']]
     bestfit = np.polyfit(df['logM'], df['logN'], 1)
     K = math.exp(bestfit[1])
     beta = bestfit[0]
-    predictions = [K*n**beta for n in df['tokens']]
+    predictions = [K*m**beta for m in df['tokens']]
     return predictions
 
-# # Stepping-stone verification that the card-deck equation can be applied to a mini-corpus
-# def minicorpus(words, s = 4, increment = 100):
-#     fdist = getFreqDist(words)
-#     s_words = fdist[fdist['freq'] == s]['word'].values
-#     k = len(set(s_words))
-#     ks = k*s
-#     words = [word for word in words if word in s_words]
-#     df = []
-#     for n in range(0, len(words)+1, increment):
-#         subset = random.sample(words, n)
-#         tokens = len(subset)
-#         types  = len(set(subset))
-#         predicted = int(k-k*(1-n/ks)**s)
-#         df.append((tokens, types, predicted))
-#     df.append((ks, k, k))
-#     df = pd.DataFrame(df, columns = ['tokens', 'types', 'predicted'])
-#     return df
-
-# Taylor Series approach
-def predictTaylor(df, M, N, deck):
+# Infinite Series approach
+def predictInfSeries(df, M, N, deck):
     deck = deck.sort_values(by = ['repeats'])
-    taylor = []
+    iseries = []
     for tokens in df['tokens']:
         terms = []
         last_term = 1
@@ -238,10 +204,10 @@ def predictTaylor(df, M, N, deck):
                 terms.append(term)
                 last_term = term
         if len(terms) > 0:
-            taylor.append(N - int(sum(terms)))
+            iseries.append(N - int(sum(terms)))
         else:
-            taylor.append(np.nan)
-    return taylor
+            iseries.append(np.nan)
+    return iseries
 
 # returns frequency distribution of words within text
 def getFreqDist(words):
@@ -249,7 +215,6 @@ def getFreqDist(words):
     df = pd.DataFrame.from_dict(fdist, orient='index')
     df.columns = ['freq']
     df['word'] = fdist.keys()
-    df['length'] = [1 if ('<' in word) else len(word) for word in df['word']]
     df['rank'] = df['freq'].rank(method='first', ascending = False)
     df = df.sort_values(by = ['rank'])
     # "perfect" Zipf's Law prediction (f1 = N)
@@ -272,9 +237,10 @@ def getDeck(fdist):
     deck['fraction_pred_zipf'] = deck['types_pred_zipf'] / N
     return deck
 
-# Takes corpus subsets at increments and breaks into decks
+# samples corpus at increments and breaks into decks
 # Chosen method: randomly sample words WITHOUT replacement
 def getDecks(words, nsamples = 250, method = 3):
+    random.seed(2701)
     decks = []
     increment = int(len(words) / nsamples)
     for M in range(increment, len(words), increment):
@@ -294,63 +260,90 @@ def getDecks(words, nsamples = 250, method = 3):
     decks = pd.concat(decks)
     return decks
 
+# Aggregate model predictions alongside empirical observations
+def getBookStats(decks, ttr):
+    M = decks['tokens'].max()
+    N = decks['types'].max()
+    deck = pd.DataFrame(decks[decks['tokens'] == M])
+    ttr['types_pred_iseries'] = predictInfSeries(ttr, M, N, deck)
+    ttr['types_pred_heaps'] = predictHeaps(ttr)
+    H = deck.loc[1, 'fraction']
+    z = 1/solveForX(H)
+    Mz = int(M * z)
+    if Mz > M:
+        Nz = int(-N * math.log(z)*z/(1-z)) # forecast Nz
+    else:
+        # lookup nearest approximate value for Nz
+        ttr['dM'] = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
+        id = ttr['dM'].idxmin()
+        Nz = ttr.loc[id]['types']
+        ttr = ttr.drop(columns = ['dM'], axis = 1)
+    N_pred = modelValues(M, Mz, Nz)[0]
+    Nz = int(Nz * N / N_pred) # fudge factor
+    predictions = [ modelValues(m, Mz, Nz) for m in ttr['tokens'] ]
+    for i, col in {0: 'types', 1:'hapax', 2:'dis', 3:'tris', 4:'tetrakis', 5:'pentakis'}.items():
+        ttr['{}_pred_model'.format(col)]  = [ elem[i] for elem in predictions ]
+        ttr['{}_frac'.format(col)] = ttr['{}'.format(col)] / ttr['types']
+        ttr['{}_frac_pred'.format(col)] = ttr['{}_pred_model'.format(col)] / ttr['types_pred_model']
+    RMSE = calcRMSE(ttr)
+    return (M, N, Mz, Nz, RMSE, ttr)
+
 # create ALL book data & write to disk
 def allStatsToDisk():
-    books = pd.read_csv('data/books.csv', index_col = 0)
+    books = []
     ttrs = [] # type-token ratio growth
     deckslist = []
-    for bookid in books.index: #[16328]: #
-        book = books.loc[bookid]
-        print('Processing ID #{}: {}...'.format(bookid, book['title']))
+
+    # # get all stats from files on disk, if any
+    # for filename in os.listdir('books/'):
+    #     # book = books.loc[bookid]
+    #     words, bookid, title = getWordBag(filename)
+    #     print('Processing ID #{}: {}...'.format(bookid, title))
+    #     decks = getDecks(words)
+    #     ttr   = getTTRCurve(decks)
+    #     M, N, Mz, Nz, RMSE, ttr = getBookStats(decks, ttr)
+    #     books.append((bookid, title, 'preprocess', M, N, Mz, Nz, RMSE[0], RMSE[1], RMSE[2]))
+    #     # for key, val in {'tokens':M, 'types':N, 'Mz':Mz, 'Nz':Nz, 'RMSE_heaps':RMSE[0], 'RMSE_iseries':RMSE[1], 'RMSE_model':RMSE[2]}.items():
+    #     #     books.at[bookid, key] = val
+    #     decks['bookid'] = bookid
+    #     decks['title']  = title
+    #     ttr['bookid'] = bookid
+    #     ttr['title']  = title
+    #     deckslist.append(decks)
+    #     ttrs.append(ttr)
+
+    # get all stats from nltk gutenberg corpus
+    bookid = 0
+    nbooks = len(gutenberg.fileids())
+    for filename in gutenberg.fileids():
+        bookid += 1
+        words, title = getWordBagFromNLTK(filename)
+        print('Processing book #{}/{}: {}...'.format(bookid, nbooks, title))
         try:
-            decks = pd.read_csv('data/decks.csv', index_col = 0)
-            decks = pd.DataFrame(decks[decks['bookid'] == bookid])
+            # read in cached decks file, if it exists
+            decks = pd.read_csv('data/decks.csv')
+            decks = decks[decks['bookid'] == bookid]
         except:
-            words = getWordBag(bookid)
             decks = getDecks(words)
-        M = decks['tokens'].max()
-        N = decks['types'].max()
-        deck = pd.DataFrame(decks[decks['tokens'] == M])
-        try:
-            ttr = pd.read_csv('data/ttr.csv', index_col = 0)
-            ttr = pd.DataFrame(ttr[ttr['bookid'] == bookid])
-        except:
-            ttr   = getTTRCurve(decks)
-        ttr['types_pred_taylor'] = predictTaylor(ttr, M, N, deck)
-        ttr['types_pred_heaps'] = predictHeaps(ttr)
-        #z = fitModel(M, N, ttr['tokens'], ttr['types'])
-        H = deck.loc[1, 'fraction']
-        z = 1/solveForX(H)
-        Mz = int(M * z)
-        if Mz > M:
-            Nz = int(-N * math.log(z)*z/(1-z)) # forecast Nz
-        else:
-            # lookup nearest approximate value for Nz
-            ttr['dM'] = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
-            id = ttr['dM'].idxmin()
-            Nz = ttr.loc[id]['types']
-            ttr = ttr.drop(columns = ['dM'])
-        N_pred = modelValues(M, Mz, Nz)[0]
-        Nz *= N / N_pred
-        predictions = [ modelValues(n, Mz, Nz) for n in ttr['tokens'] ]
-        for i, col in {0: 'types', 1:'hapax', 2:'dis', 3:'tris', 4:'tetrakis', 5:'pentakis'}.items():
-            ttr['{}_pred_model'.format(col)]  = [ elem[i] for elem in predictions ]
-            ttr['{}_frac'.format(col)] = ttr['{}'.format(col)] / ttr['types']
-            ttr['{}_frac_pred'.format(col)] = ttr['{}_pred_model'.format(col)] / ttr['types_pred_model']
-        RMSE = calcRMSE(ttr)
-        # OC = calcOffClosure(Mz, Nz)
-        for key, val in {'tokens':M, 'types':N, 'Mz':Mz, 'Nz':Nz, 'RMSE_heaps':RMSE[0], 'RMSE_taylor':RMSE[1], 'RMSE_model':RMSE[2]}.items():
-            books.at[bookid, key] = val
-        for df in [decks, ttr]:
-            df['bookid'] = bookid
-            df['title']  = book['title']
-            df['author'] = book['author']
+        ttr   = getTTRCurve(decks)
+        M, N, Mz, Nz, RMSE, ttr = getBookStats(decks, ttr)
+        books.append((bookid, title, M, N, Mz, Nz, RMSE[0], RMSE[1], RMSE[2]))
+        decks['bookid'] = bookid
+        decks['title']  = title
+        ttr['bookid'] = bookid
+        ttr['title']  = title
         deckslist.append(decks)
         ttrs.append(ttr)
+
+    # aggregate all data into single dataframes
+    books = pd.DataFrame(books, columns = ['bookid', 'title', 'tokens', 'types', 'Mz', 'Nz', 'RMSE_heaps', 'RMSE_iseries', 'RMSE_model'])
+    books = books.set_index('bookid')
     ttr = pd.concat(ttrs)
     decks = pd.concat(deckslist)
+
+    # write to disk
     books.to_csv('data/books.csv')
-    decks.to_csv('data/decks.csv')
+    decks.to_csv('data/decks.csv') # cache "raw" data, intensive to recompute
     ttr.to_csv('data/ttr.csv')
 
 # allStatsToDisk()
