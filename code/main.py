@@ -65,38 +65,6 @@ def getWordBagFromNLTK(filename):
 #     # return results
 #     return (word, bookid, title)
 
-# # Fits hapax_frac data to 1/ln(x)+1/(1-x)
-# def findOptimum(ttr):
-#     M = ttr['tokens'].max()
-#     N = ttr['types'].max()
-#     Mz = M+1
-#     dM = M/2
-#     timer = 1
-#     realY = ttr['hapax_frac']
-#     lastError = 1
-#     while (math.fabs(dM) > 100) & (timer < 999):
-#         X = ttr['tokens'] / Mz
-#         predY = [ 1/math.log(x)+1/(1-x) for x in X ]
-#         totalError = sum((predY - realY)**2)
-#         if totalError <= lastError:
-#             while Mz - dM < 0:
-#                 dM = int(dM/2)
-#         else:
-#             dM = -int(dM/2)
-#         Mz = Mz + dM
-#         lastError = totalError
-#         print('Mz = {}, dM = {}, Err = {}'.format(Mz, dM, totalError))
-#         timer += 1
-#     z = Mz/M
-#     if (Mz > M): # forecast Nz
-#         Nz = int(N * math.log(z) * z / (z-1))
-#     else:
-#         # lookup nearest approximate value for Nz
-#         dM = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
-#         idx = dM.idxmin()
-#         Nz = ttr.loc[idx]['types']
-#     return (z, Mz, Nz)
-
 # Predicts number of types based on input (m) and free parameters (Mz,Nz)
 def modelValues(m, Mz, Nz):
     x = m/Mz
@@ -268,18 +236,9 @@ def getBookStats(decks, ttr):
     ttr['types_pred_iseries'] = predictInfSeries(ttr, M, N, deck)
     ttr['types_pred_heaps'] = predictHeaps(ttr)
     H = deck.loc[1, 'fraction']
-    z = 1/solveForX(H)
-    Mz = int(M * z)
-    if Mz > M:
-        Nz = int(-N * math.log(z)*z/(1-z)) # forecast Nz
-    else:
-        # lookup nearest approximate value for Nz
-        ttr['dM'] = [ math.fabs(m - Mz) for m in ttr['tokens'] ]
-        id = ttr['dM'].idxmin()
-        Nz = ttr.loc[id]['types']
-        ttr = ttr.drop(columns = ['dM'], axis = 1)
-    N_pred = modelValues(M, Mz, Nz)[0]
-    Nz = int(Nz * N / N_pred) # fudge factor
+    z = solveForX(H)
+    Mz = int(M / z)
+    Nz = int(N * (z-1)/math.log(z)/z)
     predictions = [ modelValues(m, Mz, Nz) for m in ttr['tokens'] ]
     for i, col in {0: 'types', 1:'hapax', 2:'dis', 3:'tris', 4:'tetrakis', 5:'pentakis'}.items():
         ttr['{}_pred_model'.format(col)]  = [ elem[i] for elem in predictions ]
@@ -315,7 +274,7 @@ def allStatsToDisk():
     # get all stats from nltk gutenberg corpus
     bookid = 0
     nbooks = len(gutenberg.fileids())
-    for filename in gutenberg.fileids():
+    for filename in gutenberg.fileids(): # ['bible-kjv.txt', 'blake-poems.txt']: #
         bookid += 1
         words, title = getWordBagFromNLTK(filename)
         print('Processing book #{}/{}: {}...'.format(bookid, nbooks, title))
@@ -346,4 +305,4 @@ def allStatsToDisk():
     decks.to_csv('data/decks.csv') # cache "raw" data, intensive to recompute
     ttr.to_csv('data/ttr.csv')
 
-# allStatsToDisk()
+allStatsToDisk()

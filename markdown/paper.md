@@ -8,7 +8,7 @@
 
 ### Introduction
 
-Zipf's Law is usually formulated as Freq $\propto$ 1/Rank, generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in a type-token growth model can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
+Zipf's Law is usually formulated as Freq $\propto$ 1/Rank, generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in modeling a type-token growth curve can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
 
 ![Figure 1: Word Frequency Distributions have Fat Tails](img/fat-tail.png)
 
@@ -34,13 +34,15 @@ For a text corpus consisting of $M$ tokens and $N$ types, randomly sampling $m$ 
 
 $$E(m) = N_z\ln\bigg(\frac{m}{M_z}\bigg)\frac{\frac{m}{M_z}}{\frac{m}{M_z}-1}$$ [1]
 
+The procedure for obtaining the parameters $(M_z, N_z)$ is described in the "Accuracy" section later, equations [19] and [20], respectively.
+
 ### Lemma: The Uniform Case
 
 For some small $n$, construct a $(kn, k)$-corpus by collecting every word that occurs *exactly* $n$ times. This mini-corpus, a sub-selection of the whole, has a perfectly uniform word frequency distribution, a text consisting of $kn$ total words (tokens): $k$ distinct words (types) each repeating exactly $n$ times. What is $E_n(m)$, the expected number of types in a random selection of $m$ words out of this mini-corpus? If sampling sequentially without replacement, the expected value is the partial sum of the probability at each step of drawing a new type.
 
 $$E_n(m+1) = E_n(m) + P_{new}(m+1)$$ [2]
 
-Suppose $m$ tokens are drawn at random without replacement, resulting in $y$ types. There are then $kn-m$ tokens left to draw, $n(k-y)$ of which are types not yet drawn. Thus,
+Suppose $m$ tokens are drawn at random without replacement, resulting in $y$ types. There are then $kn-m$ tokens left to draw, $n(k-y)$ of which are of a type not yet drawn. Thus,
 
 $$P_{new}(m+1) = \frac{n(k-y)}{kn-m}$$ and $$E_n(m+1) = y + \frac{n(k-y)}{kn-m}$$ [3]
 
@@ -54,7 +56,7 @@ This recursion performs quite well with real data. Consider a shuffled deck of c
 
 We can use calculus to derive a non-recursive version of this function. Since the derivative is approximately equal to the vertical distance between successive elements in the series, we can rewrite [4] and integrate.
 
-$$\frac{dE}{dm} \approx \frac{E_n(m+1)-E_n(m)}{m+1-m}$$ [5]
+$$\frac{dE}{dm} \approx \frac{E_n(m)-E_n(m-1)}{m-(m-1)} = P_{new}(m)$$ [5]
 
 $$dE \approx \frac{n(k - E)}{kn-m} dm \to \int \frac{dE}{k - E} \approx n\int \frac{dm}{kn-m} \to -ln(k-E) \approx -n\ln(kn-m)+C$$ 
 
@@ -88,11 +90,11 @@ $$E(x) = N - \sum_{n=0}^\infty k_n(1-x)^n$$ for $x=\frac{m}{M}$ [8b]
 
 What does [8] really *mean*? What happens when we sample $m$ tokens at random, or some proportion $x$ of the corpus? Choosing a sample size of $x=1$ gives a permutation of the original corpus, and it's easy to see from [8b] that $E(1) = N$ as expected, i.e. all types are drawn. Sampling some proportion $x$ of the corpus, we expect $E(x)$ types to be drawn, and $N-E(x)$ types *not* to be drawn. What is the expected value of the latter? For the hapaxes, the probability of *not* drawing each token is $1-x$, so the expected number of hapaxes *not* drawn is $k_1(1-x)$. The probability of *not* drawing *both* instances of each dis legomenon is $(1-x)^2$ so the expected number of dis legomena *not* drawn is $k_2(1-x)^2$. Continuing this argument, we define $k_0(x)$, the expected number of types *not* drawn when sampling proportion $x$ of the corpus:
 
-$$k_0(x) = k_1(1-x)+k_2(1-x)^2+k_3(1-x)^3+... = N-E(x)$$ [9]
+$$k_0(x) = k_0 + k_1(1-x)+k_2(1-x)^2+k_3(1-x)^3+... = N-E(x)$$ [9]
 
 It can be seen that [9] is just a way of rewriting [8b] given this new intuition. But let's go further. How many *hapaxes* can be expected when sampling proportion $x$ of the corpus? The expected number of hapaxes drawn is $k_1x$. But a hapax will be *created* in the sample if *one* instance of a dis legomenon is drawn but not the other. We should expect ${2 \choose 1}k_2x(1-x)$ to be created this way. Likewise, we expect to create a hapax in our sample by drawing only *one* of the three instances of each tris legomenon, resulting in ${3 \choose 1}k_3x(1-x)^2$ created this way. In general, using the shorthand $k_n = k_n(1)$,
 
-$$k_1(x) = k_1x + 2k_2x(1-x) + 3k_3x(1-x)^2 + 4k_4x(1-x)^4 + ...$$ [10]
+$$k_1(x) = k_1x + 2k_2x(1-x) + 3k_3x(1-x)^2 + 4k_4x(1-x)^3 + ...$$ [10]
 
 $$k_n(x) = \sum_{i=n}^\infty {i \choose n}k_ix^n(1-x)^{i-n}$$ [11]
 
@@ -127,11 +129,15 @@ k_4 \\
 $$
 $$\hat{k}(x) = A_x\hat{k}$$ [12]
 
-Notice [11] can be expressed in terms of the $n$th derivatives of $E$ for $n>0$:
+$$\hat{k}(0) = A_0\hat{k} = (N, 0, 0, 0, ...)$$ [12a]
+
+$$\hat{k}(1) = (0, k_1, k_2, k_3, ...)$$ [12b]
+
+(If the idea of infinite matrices doesn't sit well, remember $\hat{k}$ is always finite in practice.) Notice [11] can be expressed in terms of the $n$th derivatives of $E$ for $n>0$:
 
 $$k_n(x) = (-1)^n\frac{x^n}{n!}k_0^{(n)}(x) = (-1)^{n+1}\frac{x^n}{n!}E^{(n)}(x)$$ [14]
 
-By now we've achieved three results, having not yet made a single empirical assumption about the word frequency distribution of a corpus.
+By now we've achieved three results, having not yet made a single empirical assumption about the word frequency distribution of a corpus. Any type-token system describable in terms of the evolution of some $\hat{k}$ follows these rules.
 
 1.  Equation [12] gives an algorithmic approach to predicting $n$-legomena counts when sampling a corpus. Using the observed counts from the *whole* corpus as input, the word frequency distribution of any sample can be simulated by constructing $A_x$ and transforming $\hat{k}$.
 2.  Any function such as Heap's Law which approximates the type-token growth curve can be generalized via [14] to make testable predictions for $n$-legomena counts as well.
@@ -167,7 +173,7 @@ Substituting [15] into [8b] above,
 
 $$E(x) = N_z - N_z\sum_{n=1}^{\infty} \frac{(1-x)^n}{n(n+1)}$$ [16]
 
-It can be shown (Appendix 2) that [16] converges on [17]. Taking successive derivatives, per [14], we now have expressions not just for the number of types with respect to tokens, but also hapaxes and higher $n$-legomena:
+It can be shown that [16] converges on [17]. Taking successive derivatives, per [14], we now have expressions not just for the number of types with respect to tokens, but also hapaxes and higher $n$-legomena:
 
 $$E(x) = N_z\frac{\ln(x)x}{x-1}$$ [17]
 
@@ -185,11 +191,15 @@ $$k_5(x)=N_z\frac{12x^6+65x^5-60x^5\ln(x)-120x^4+60x^3-20x^2+3x}{60(x-1)^6}$$ [1
 
 ### Accuracy
 
-The King James Bible is a $(1010654,13769)$-corpus. (Notes on methodology and all code in Appendix 1.) The most common word "the" appears $62103$ times (not $13769$), and $32$.06% of the types are hapaxes (not $50$%). It is nowhere near an optimum sample, so how do we find a suitable $(M_z, N_z)$? The proportion of hapaxes is a decreasing function, starting at $H(0)=1$, falling to $H(1)=\frac{1}{2}$, and continuing to fall as $x$ goes to infinity. We can model this by expressing [17.1] as a proportion of [17] to obtain:
+The King James Bible is a $(1010654,13769)$-corpus. The most common word "the" appears $62103$ times (not $13769$), and $h_{obs}=32.06$% of the types are hapaxes (not $50$%). It is nowhere near an optimum sample, so how do we find a suitable $(M_z, N_z)$? The proportion of hapaxes is a decreasing function, starting at $H(0)=1$, falling to $H(1)=\frac{1}{2}$, and continuing to fall as $x$ goes to infinity. We can model this by expressing [17.1] as a proportion of [17] to obtain:
 
 $$H(x) = \frac{k_1(x)}{E(x)} = \frac{1}{\ln(x)}+\frac{1}{1-x}$$ [18]
 
 In the limit, $H(0)=1, H(1)=\frac{1}{2}$ as expected, even though the function is undefined at those points. Using a binary search algorithm, we find that $H(10.41)=.3206$. Could this mean the Bible is ten times "too large" to exhibit Zipf's Law? Taking $M_z = M/10.41$ and scaling $N_z$ such that $E(M)=N$, we fit [1] to our sample corpus using optimum sample parameters $(M_z,N_z) = (97084,5312)$.
+
+$$M_z = M/z$$ for $$H(z) = h_{obs}$$ [19]
+
+$$N_z = N\frac{(z-1)}{\ln(z)z}$$ [20]
 
 $$E(m) = 5312\ln(m/97084)\frac{m/97084}{m/97084-1}$$ [1.1]
 
@@ -211,7 +221,7 @@ $$E(m) = 5312\ln(m/97084)\frac{m/97084}{m/97084-1}$$ [1.1]
 
 ![Figure 4: Bible Actual vs Model](img/bible-accuracy.png)
 
-William Blake's "Poems" is a $(8283,1812)$-corpus. The most common word "the" appears $351$ times and $55.73$% of its types are hapaxes. Using a binary search, we find that $H(.5000) = .5573$, making Poems "too small" by half. Using the same procedure as above, we find $(M_z,N_z) = (16121,2574)$.
+William Blake's *Poems* is a $(8354,1820)$-corpus. The most common word "the" appears $351$ times (not $1820$) and $h_{obs} = 55.44$% of its types are hapaxes. Using a binary search, we find that $H(.5182) = .5544$, making *Poems* "too small" by half. Using the same procedure as above, we find $(M_z,N_z) = (16121,2574)$.
 
 $$E(m) = 2574\ln(m/16121)\frac{m/16121}{m/16121-1}$$ [1.2]
 
@@ -262,7 +272,11 @@ Repeating the procedure, we obtain values for $(M_z,N_z)$ that estimate types, h
 
 ![Figure 7: RMSE by Corpus Size](img/rmse.png)
 
-It's worth reinforcing that Zipf's Law is only accurate when applied to a certain optimum sample size of a given corpus. Smaller samples *won't* follow Zipf's Law, but as text accumulates, the sample will reach a tipping point at which it exhibits Zipf's Law peculiarly well. As text continues to accumulate, the pattern deteriorates in the opposite direction. The logarithmic functions [17.x] accurately model this behavior even if they can't explain the motivation for it.
+### Discussion
+
+It's worth reinforcing that Zipf's Law is only accurate when applied to a certain optimum sample size of a given corpus. Smaller samples *won't* follow Zipf's Law, but as text accumulates, the sample will reach a phase at which it exhibits Zipf's Law peculiarly well. As text continues to accumulate, the pattern deteriorates in the opposite direction. The logarithmic functions [17.x] accurately model this behavior even if they can't explain the motivation for it. But it has to be stressed that Zipf's Law is *not* a pattern accurately describing all texts; it is better thought of as describing a phase text passes through as it accumulates.
+
+This phase is the point at which (a) there are approximately as many instances of the most common word (usually "the") as there are distinct words in the vocabulary, and (b) the proportions of hapaxes, dis, tris, etc legomena with respect to the number of types is roughly $\bigg\{\frac{1}{2},\frac{1}{6},\frac{1}{12},\frac{1}{20},\frac{1}{30}, ...\bigg\}$. It should not be expected that (a) and (b) *always* hold, and that some texts follow this more accurately than others. Our hypothesis is that it seems to be the case that *all* texts follow (a) and (b) peculiarly well at some optimum sample size, and that by discovering this optimum, accurate predictions can be made for how these proportions evolve as the sample size is varied.
 
 ### Conclusion
 
