@@ -56,7 +56,7 @@ This recursion performs quite well with real data. Consider a shuffled deck of c
 
 We can use calculus to derive a non-recursive version of this function. Since the derivative is approximately equal to the vertical distance between successive elements in the series, we can rewrite [4] and integrate.
 
-$$\frac{dE}{dm} \approx \frac{E_n(m)-E_n(m-1)}{m-(m-1)} = P_{new}(m)$$ [5]
+$$\frac{dE}{dm} \approx \frac{E_n(m+1)-E_n(m)}{m+1-m} = P_{new}(m+1)$$ [5]
 
 $$dE \approx \frac{n(k - E)}{kn-m} dm \to \int \frac{dE}{k - E} \approx n\int \frac{dm}{kn-m} \to -ln(k-E) \approx -n\ln(kn-m)+C$$ 
 
@@ -92,7 +92,7 @@ What does [8] really *mean*? What happens when we sample $m$ tokens at random, o
 
 $$k_0(x) = k_0 + k_1(1-x)+k_2(1-x)^2+k_3(1-x)^3+... = N-E(x)$$ [9]
 
-It can be seen that [9] is just a way of rewriting [8b] given this new intuition. But let's go further. How many *hapaxes* can be expected when sampling proportion $x$ of the corpus? The expected number of hapaxes drawn is $k_1x$. But a hapax will be *created* in the sample if *one* instance of a dis legomenon is drawn but not the other. We should expect ${2 \choose 1}k_2x(1-x)$ to be created this way. Likewise, we expect to create a hapax in our sample by drawing only *one* of the three instances of each tris legomenon, resulting in ${3 \choose 1}k_3x(1-x)^2$ created this way. In general, using the shorthand $k_n = k_n(1)$,
+It can be seen that [9] is just a way of rewriting [8b] given this new intuition. But let's go further. How many *hapaxes* can be expected when sampling proportion $x$ of the corpus? The expected number of existing hapaxes drawn is $k_1x$. But a hapax will be *created* in the sample if *one* instance of a dis legomenon is drawn but not the other. We should expect ${2 \choose 1}k_2x(1-x)$ to be created this way. Likewise, we expect to create a hapax in our sample by drawing only *one* of the three instances of each tris legomenon, resulting in ${3 \choose 1}k_3x(1-x)^2$ created this way. In general, using the shorthand $k_n = k_n(1)$,
 
 $$k_1(x) = k_1x + 2k_2x(1-x) + 3k_3x(1-x)^2 + 4k_4x(1-x)^3 + ...$$ [10]
 
@@ -131,7 +131,7 @@ $$\hat{k}(x) = A_x\hat{k}$$ [12]
 
 $$\hat{k}(0) = A_0\hat{k} = (N, 0, 0, 0, ...)$$ [12a]
 
-$$\hat{k}(1) = (0, k_1, k_2, k_3, ...)$$ [12b]
+$$\hat{k}(1) = A_1\hat{k} = I\hat{k} = (0, k_1, k_2, k_3, ...)$$ [12b]
 
 (If the idea of infinite matrices doesn't sit well, remember $\hat{k}$ is always finite in practice.) Notice [11] can be expressed in terms of the $n$th derivatives of $E$ for $n>0$:
 
@@ -151,7 +151,7 @@ Suppose that for a given $(M,N)$-corpus there exists a corresponding optimal sam
 
 ![Figure 3: Perfect Zipf Distribution](img/zipf-perfect.png)
 
-Define a *perfect Zipf distribution* as follows: For some $(M_z,N_z)$-corpus with a ranked word frequency distribution $F_z=\{f_r\}$, the expected number of types repeating $n$ or more times $\pi(f_r \ge n)$ is roughly equal to $\frac{1}{n}N_z$. Alternatively, there exists about $\frac{1}{n}N_z$ types repeating $n$ or more times. "Roughly" and "about" to allow for normal statistical noise in the still "perfect" sample.
+Define a *perfect Zipf distribution* as follows: For some $(M_z,N_z)$-corpus with a ranked word frequency distribution $(f_1, f_2, f_3, ...)$, the expected number of types repeating $n$ or more times $\pi(f_r \ge n)$ is roughly equal to $\frac{1}{n}N_z$. Alternatively, there exists about $\frac{1}{n}N_z$ types repeating $n$ or more times. "Roughly" and "about" to allow for normal statistical noise in the still "perfect" sample.
 
 **Corollaries:**
 
