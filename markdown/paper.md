@@ -147,7 +147,7 @@ Can $\hat{k}$ be approximated by a series? In real text, do the tabulations of $
 
 ### Zipf's Law
 
-Suppose that for a given $(M,N)$-corpus there exists a corresponding optimal sample $(M_z,N_z)$-corpus following a *perfect Zipf distribution*. If the original corpus is "too big" then some number of randomly selected tokens $M_z<M$ will produce a sub-selection of text exhibiting Zipf's Law. If the original corpus is "too small" then it can be thought of as a sub-selection of some larger corpus consisting of $M_z>M$ tokens exhibiting Zipf's Law. (Of course, some corpora may be "just right" and $M_z = M$.)
+Suppose that for a given $(M,N)$-corpus there exists a corresponding optimum sample $(M_z,N_z)$-corpus following a *perfect Zipf distribution*. If the original corpus is "too big" then some number of randomly selected tokens $M_z<M$ will produce a sub-selection of text exhibiting Zipf's Law. If the original corpus is "too small" then it can be thought of as a sub-selection of some larger corpus consisting of $M_z>M$ tokens exhibiting Zipf's Law. (Of course, some corpora may be "just right" and $M_z = M$.)
 
 ![Figure 3: Perfect Zipf Distribution](img/zipf-perfect.png)
 
