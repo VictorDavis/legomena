@@ -1,1 +1,1 @@
-web: python plotme.py
+web gunicorn app:server
