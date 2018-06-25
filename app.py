@@ -59,9 +59,7 @@ def graphRMSE():
     return fig
 
 # Show plots in dashboard
-app = dash.Dash()
-
-server = app.server
+app = dash.Dash(__name__, server=server)
 
 app.layout = html.Div([
     html.Div([
