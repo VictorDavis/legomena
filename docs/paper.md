@@ -4,11 +4,11 @@
 
 ### Abstract
 
-Heap's Law[^4] states that in a large enough text corpus, the number of types as a function of tokens grows as $N=KM^\beta$ for some free parameters $K,\beta$. Much has been written[^6][^7][^8][^9][^13] about how this result and various generalizations can be derived from Zipf's Law[^3]. Here we derive from first principles a completely novel expression of the type-token curve and prove its superior accuracy on real text. This expression naturally generalizes to equally accurate estimates for counting hapaxes and higher $n$-legomena.
+Heap's Law[^1] states that in a large enough text corpus, the number of types as a function of tokens grows as $N=KM^\beta$ for some free parameters $K,\beta$. Much has been written[^2][^3][^4][^5][^6] about how this result and various generalizations can be derived from Zipf's Law[^7]. Here we derive from first principles a completely novel expression of the type-token curve and prove its superior accuracy on real text. This expression naturally generalizes to equally accurate estimates for counting hapaxes and higher $n$-legomena.
 
 ### Introduction
 
-Zipf's Law is usually formulated as Freq $\propto$ 1/Rank[^3], generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in modeling a type-token growth curve can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
+Zipf's Law is usually formulated as Freq $\propto$ 1/Rank[^7], generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in modeling a type-token growth curve can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
 
 ![Figure 1: Word Frequency Distributions have Fat Tails](img/fat-tail.png)
 
@@ -419,30 +419,25 @@ Most investigations of Zipf's and Heap's respective Laws and their inter-relatio
 
 ### References
 
-[^1]: www.hup.harvard.edu/catalog.php?isbn=9780674434929 Zipf, George 1932 *Selective studies and the principle of relative frequency in language* (Cambridge: Harvard University Press)
+| [^1]|[^2]|[^3]|[^4]|[^5]|[^6]|[^7]|[^8]|[^9]|[^10]|[^11]|[^12]|[^13]|[^14]|
 
-[^2]: https://catalog.hathitrust.org/Record/000359461 Zipf, George 1935 *The psycho-biology of language: An introduction to dynamic philology* (Boston: Mifflin Company)
+[^1]: https://dl.acm.org/citation.cfm?id=539986 Heaps, H S 1978 *Information Retrieval: Computational and Theoretical Aspects* (Academic Press)
+[^2]: http://iopscience.iop.org/article/10.1088/1367-2630/15/9/093033 Font-Clos, Francesc 2013 *A scaling law beyond Zipf's law and its relation to Heaps' law* (New Journal of Physics 15 093033)
 
-[^3]: http://dx.doi.org/10.1037/h0052442 Zipf, George 1949 *Human behavior and the principle of least effort* (Reading: Addison-Wesley)
+[^3]: http://iopscience.iop.org/article/10.1088/1367-2630/11/12/123015 Bernhardsson S, da Rocha L E C and Minnhagen P 2009 *The meta book and size-dependent properties of written language* (New Journal of Physics 11 123015)
 
-[^4]: https://dl.acm.org/citation.cfm?id=539986 Heaps, H S 1978 *Information Retrieval: Computational and Theoretical Aspects* (Academic Press)
+[^4]: http://iopscience.iop.org/article/10.1088/1742-5468/2011/07/P07013 Bernhardsson S, Ki Baek and Minnhagen 2011 *A paradoxical property of the monkey book* (Journal of Statistical Mechanics: Theory and Experiment, Volume 2011)
 
-[^5]: https://www.journals.uchicago.edu/doi/abs/10.1086/364570 Herdan, Gustav 1960 *Type-token mathematics* (The Hague: Mouton)
+[^5]: http://milicka.cz/kestazeni/type-token_relation.pdf Milička, Jiřı́ 2009 *Type-token & Hapax-token Relation: A Combinatorial Model* (Glottotheory. International Journal of Theoretical Linguistics 2 (1), 99–110)
+[^6]: https://www.nature.com/articles/srep00943 Petersen, Alexander 2012 *Languages cool as they expand: Allometric scaling and the decreasing need for new words* (Scientific Reports volume 2, Article number: 943)
+[^7]: http://dx.doi.org/10.1037/h0052442 Zipf, George 1949 *Human behavior and the principle of least effort* (Reading: Addison-Wesley)
+[^8]: www.hup.harvard.edu/catalog.php?isbn=9780674434929 Zipf, George 1932 *Selective studies and the principle of relative frequency in language* (Cambridge: Harvard University Press)
+[^9]: https://catalog.hathitrust.org/Record/000359461 Zipf, George 1935 *The psycho-biology of language: An introduction to dynamic philology* (Boston: Mifflin Company)
+[^10]: https://www.journals.uchicago.edu/doi/abs/10.1086/364570 Herdan, Gustav 1960 *Type-token mathematics* (The Hague: Mouton)
+[^11]: https://dl.acm.org/citation.cfm?id=325476 Baeza-Yates, Ricardo 1997 *Block Addressing Indices for Approximate Text Retrieval* (Journal of the American Society for Information Science, v.51 n.1, p.69-82, Jan. 2000)
 
-[^6]: http://iopscience.iop.org/article/10.1088/1367-2630/15/9/093033 Font-Clos, Francesc 2013 *A scaling law beyond Zipf's law and its relation to Heaps' law* (New Journal of Physics 15 093033)
+[^12]: http://dx.doi.org/10.1155/2012/480196 Chen, Yanguang 2012 Zipf’s law, *Hierarchical Structure, and Shuffling-Cards Model for Urban Development* (Discrete Dynamics in Nature and Society, Volume 2012)
 
-[^7]: http://iopscience.iop.org/article/10.1088/1367-2630/11/12/123015 Bernhardsson S, da Rocha L E C and Minnhagen P 2009 *The meta book and size-dependent properties of written language* (New Journal of Physics 11 123015)
-
-[^8]: http://iopscience.iop.org/article/10.1088/1742-5468/2011/07/P07013 Bernhardsson S, Ki Baek and Minnhagen 2011 *A paradoxical property of the monkey book* (Journal of Statistical Mechanics: Theory and Experiment, Volume 2011)
-
-[^9]: http://milicka.cz/kestazeni/type-token_relation.pdf Milička, Jiřı́ 2009 *Type-token & Hapax-token Relation: A Combinatorial Model* (Glottotheory. International Journal of Theoretical Linguistics 2 (1), 99–110)
-
-[^10]: https://dl.acm.org/citation.cfm?id=325476 Baeza-Yates, Ricardo 1997 *Block Addressing Indices for Approximate Text Retrieval* (Journal of the American Society for Information Science, v.51 n.1, p.69-82, Jan. 2000)
-
-[^11]: http://dx.doi.org/10.1155/2012/480196 Chen, Yanguang 2012 Zipf’s law, *Hierarchical Structure, and Shuffling-Cards Model for Urban Development* (Discrete Dynamics in Nature and Society, Volume 2012)
-
-[^12]: http://iopscience.iop.org/article/10.1088/1367-2630/13/4/043004 Seung, Ki Baek 2011 *Zipf's law unzipped* (New Journal of Physics 13 043004)
-
-[^13]: https://www.nature.com/articles/srep00943 Petersen, Alexander 2012 *Languages cool as they expand: Allometric scaling and the decreasing need for new words* (Scientific Reports volume 2, Article number: 943)
+[^13]: http://iopscience.iop.org/article/10.1088/1367-2630/13/4/043004 Seung, Ki Baek 2011 *Zipf's law unzipped* (New Journal of Physics 13 043004)
 
 [^14]: https://doi.org/10.1016/j.physa.2011.05.003 Eliazar, Iddo 2011 *The growth statistics of Zipfian ensembles: Beyond Heaps’ law* (Physica A, Volume 390, Issue 20)
