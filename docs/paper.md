@@ -1,6 +1,6 @@
-# Types, Tokens, and Hapaxes: A New Heap's Law
+# Victor Davis
 
-## Victor Davis
+## Types, Tokens, and Hapaxes: A New Heap's Law
 
 ### Abstract
 
@@ -8,11 +8,11 @@ Heap's Law[^1] states that in a large enough text corpus, the number of types as
 
 ### Introduction
 
-Zipf's Law is usually formulated as Freq $\propto$ 1/Rank[^7], generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in modeling a type-token growth curve can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
+Zipf's Law is usually formulated[^7] as Freq $\propto$ 1/Rank, generalized by raising Rank to an exponent $\alpha$. This is benchmarked against real text and shown to be curiously accurate for corpora of varying sizes but exhibiting a fat tail. Therefore it performs most poorly on rare words, which contribute the most to the type-token curve. The common interpretation is that any inaccuracy in modeling a type-token growth curve can be explained away by this fat tail in which the unpredictability of the frequency of rare words introduces noise into an otherwise correct signal. This paradigm is completely false. We show that Zipf's Law can be reformulated to model the frequencies of rare words as accurately as common ones and that this reformulation leads to a simple, intuitive derivation of a logarithmic (*not* exponential) type-token growth curve.
 
 ![Figure 1: Word Frequency Distributions have Fat Tails](img/fat-tail.png)
 
-### Terminology
+### Keywords
 
 **Tokens**: Instances of words in a text, elements of the corpus in which words are considered an ordered list. (Using "words" and "tokens" interchangeably.)
 
@@ -38,11 +38,11 @@ E(m) = N_z\ln\bigg(\frac{m}{M_z}\bigg)\frac{\frac{m}{M_z}}{\frac{m}{M_z}-1} \tag
 \end{equation}
 $$
 
-The procedure for obtaining the parameters $(M_z, N_z)$ is described in the "Accuracy" section later, equations $\eqref{eq:19}$ and $\eqref{eq:20}$, respectively.
+The procedure for obtaining the parameters $(M_z, N_z)$ is described in the "Results" section later, equations $\eqref{eq:19}$ and $\eqref{eq:20}$, respectively.
 
-### Lemma: The Uniform Case
+### Methods
 
-For some small $n$, construct a $(kn, k)$-corpus by collecting every word that occurs *exactly* $n$ times. This mini-corpus, a sub-selection of the whole, has a perfectly uniform word frequency distribution, a text consisting of $kn$ total words (tokens): $k$ distinct words (types) each repeating exactly $n$ times. What is $E_n(m)$, the expected number of types in a random selection of $m$ words out of this mini-corpus? If sampling sequentially without replacement, the expected value is the partial sum of the probability at each step of drawing a new type.
+For some small $n​$, construct a $(kn, k)​$-corpus by collecting every word that occurs *exactly* $n​$ times. This mini-corpus, a sub-selection of the whole, has a perfectly uniform word frequency distribution, a text consisting of $kn​$ total words (tokens): $k​$ distinct words (types) each repeating exactly $n​$ times. What is $E_n(m)​$, the expected number of types in a random selection of $m​$ words out of this mini-corpus? If sampling sequentially without replacement, the expected value is the partial sum of the probability at each step of drawing a new type.
 
 $$
 \begin{equation}
@@ -80,7 +80,7 @@ We can use calculus to derive a non-recursive version of this function. Since th
 
 $$
 \begin{equation}
-\frac{dE}{dm} \approx \frac{E_n(m+1)-E_n(m)}{m+1-m} = P_{new}(m+1) \approx \frac{n(k - E)}{kn-m} \tag{5}\label{eq:5}
+\frac{dE}{dm} \approx \frac{E_n(m+1)-E_n(m)}{m+1-m} = P_{new}(m+1) = \frac{n(k - E)}{kn-m} \tag{5}\label{eq:5}
 \end{equation}
 $$
 
@@ -123,7 +123,7 @@ The whole corpus consists of all these decks randomly shuffled together. Samplin
 
 $$E(m) = \sum E_n\bigg(\frac{nk_n}{M}m\bigg)= \sum k_n-k_n\bigg(1-\frac{m}{M}\bigg)^n = N - \sum k_n\bigg(1-\frac{m}{M}\bigg)^n$$
 
-As for the bounds on the summation, we can consider $\hat{k}$ a finite vector in infinite-dimensional space with zeroes imputed into missing indexes (numbers $n$ for which no words occur *exactly* $n$ times). This expression $\eqref{eq:8}$, as we'll see later in the "Accuracy" section, performs nearly perfectly on real data. We can also rewrite it as an infinite series over the interval $[0,1]$ by substituting $x=\frac{m}{M}$ the proportion of the corpus sampled rather than the raw token count.
+As for the bounds on the summation, we can consider $\hat{k}$ a finite vector in infinite-dimensional space with zeroes imputed into missing indexes (numbers $n$ for which no words occur *exactly* $n$ times). This expression $\eqref{eq:8}$, as we'll see later in the "Results" section, performs nearly perfectly on real data. We can also rewrite it as an infinite series over the interval $[0,1]$ by substituting $x=\frac{m}{M}$ the proportion of the corpus sampled rather than the raw token count.
 
 $$
 \begin{equation}
@@ -304,7 +304,7 @@ k_5(x)=N_z\frac{12x^6+65x^5-60x^5\ln(x)-120x^4+60x^3-20x^2+3x}{60(x-1)^6} \tag{1
 \end{equation}
 $$
 
-### Accuracy
+### Results
 
 The King James Bible is a $(1010654,13769)$-corpus. The most common word "the" appears $62103$ times (not $13769$), and $h_{obs}=32.06$% of the types are hapaxes (not $50$%). It is nowhere near an optimum sample, so how do we find a suitable $(M_z, N_z)$? The proportion of hapaxes is a decreasing function, starting at $H(0)=1$, falling to $H(1)=\frac{1}{2}$, and continuing to fall as $x$ goes to infinity. We can model this by expressing $\eqref{eq:17.1}$ as a proportion of $\eqref{eq:17}$ to obtain:
 
@@ -416,6 +416,10 @@ This phase is the point at which (a) there are approximately as many instances o
 ### Conclusion
 
 Most investigations of Zipf's and Heap's respective Laws and their inter-relationship tolerate a conspicuous degree of error when applied to real text. This may reflect an implicit bias that these "laws" are mere curiosities of nature, that no model *should* be able to fit cogent, rational human language to a tidy physics equation. Shockingly, the discovery of the formulas above and their accurate fit to real data imply that, far from being mere curiosities, Zipf's Law and its corresponding derivations for estimating types, hapaxes, and higher $n$-legomena must be more fundamental to the nature of language than we give it credit. It's still an open question *why* Zipf's Law seems to hold. Taking it in a very literal formulation as an axiom, accurate predictions can be made about real text, bolstering the idea that *something* fundamental must be going on, and Zipf's original observation must be the inevitable cumulative effect of some deeper, underlying information-theoretic property of human language.
+
+### Correspondence Address
+
+Victor Davis <victor.davis.us@member.mensa.org>
 
 ### References
 
