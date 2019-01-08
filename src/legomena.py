@@ -1,11 +1,12 @@
 
 # bloody dependencies
-import collections
+from collections import Counter, namedtuple
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
 
 # main class
-class Legomena:
+class Corpus:
 
     ## object properties
     tokens = None           # corpus under study, list of strings
@@ -14,7 +15,9 @@ class Legomena:
     M      = None           # number of tokens in the corpus
     N      = None           # number of types in the corpus
     res    = 100            # number of samples to take when building a TTR curve
-    ttr_df = None           # dataframe containing type/token counts from corpus samples
+    TTR    = None           # dataframe containing type/token counts from corpus samples
+    heaps_K = None          # best-fit Heap's coefficient N = KM^B
+    heaps_B = None          # best-fit Heap's exponent N = KM^B
 
     #
     def __init__(self, tokens:list):
@@ -28,9 +31,9 @@ class Legomena:
         self.k = self.getLegoVectorK()
 
         # report
-        print("Number of tokens (self.M):", self.M)
-        print("Number of types  (self.N):", self.N)
-        print("Legomena vector  (self.k):", self.k)
+        print("Number of tokens (<corpus>.M):", self.M)
+        print("Number of types  (<corpus>.N):", self.N)
+        print("Legomena vector  (<corpus>.k):", self.k[:9])
 
     #
     def getFrequencyDistribution(self, tokens:list = None, normalized:bool = False) -> dict:
@@ -45,8 +48,11 @@ class Legomena:
             tokens = self.tokens
 
         # calculate frequency distribution
-        fdist = collections.Counter(self.tokens)
+        fdist = Counter(self.tokens)
         fdist = dict(fdist)
+
+        # return
+        print("Frequency distribution accessible as <corpus>.fdist")
         return fdist
 
     #
@@ -76,8 +82,10 @@ class Legomena:
         df = pd.concat([df_complete, df], axis = 1)
         df.fillna(0, inplace = True)
         k = df.astype({"kn":int}).kn.values
+        k = np.array(k)
 
         # return vector
+        print("Legomena counts accessible as <corpus>.k")
         return k
 
     #
@@ -126,9 +134,86 @@ class Legomena:
         '''Returns list of tokens occurring exactly n times in the corpus.'''
 
         # all times occurring exactly n times
-        return [ type for type, frequency in self.fdist.items() if freq == 1 ]
+        return [ type for type, freq in self.fdist.items() if freq == n ]
 
     #
-    def fitHeaps(self) -> tuple:
-        '''Finds best-fit K,B parameters for Heaps Law'''
-        return None
+    def hapaxes(self):
+        '''Returns list of hapaxes (words that only appear once)'''
+
+        # hapax = 1-legomena
+        return self.nlegomena(1)
+
+    #
+    def buildTTRCurve(self, seed:int = None) -> pd.DataFrame:
+        '''
+        Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
+        curve consisting of points (m, n)
+            - seed: (optional) Set a random seed for reproduceability
+        '''
+
+        # set random seed
+        np.random.seed(seed)
+
+        # sample the corpus
+        m_choices = [ int((x+1) * self.M / self.res) for x in range(self.res) ]
+        TTR = []
+        for m_tokens in m_choices:
+            tokens = np.random.choice(self.tokens, m_tokens, replace = False)
+            n_types = self.countTypes(tokens)
+            TTR.append((m_tokens, n_types))
+
+        # save to self.TTR as dataframe
+        self.TTR = pd.DataFrame(TTR, columns = ["m_tokens", "n_types"])
+
+        # annotate for log-log plotting & for fitting Heap's Law
+        self.TTR["log_m"] = np.log(self.TTR.m_tokens)
+        self.TTR["log_n"] = np.log(self.TTR.n_types)
+
+        # return
+        print("Type-Token Relation curve accessible as <corpus>.TTR")
+        return self.TTR
+
+    #
+    def fitHeaps(self) -> LinearRegression:
+        '''Finds best-fit (K,B) parameters for Heaps Law'''
+
+        # use linear regression to fit K, B to TTR data on a log/log scale
+        df = self.TTR
+        model = LinearRegression()
+        X_values = df.log_m.values.reshape(-1, 1)
+        model.fit(X = X_values, y = df.log_n)
+        B = model.coef_[0]
+        K = np.exp(model.intercept_)
+        self.heaps_K, self.heaps_B = K, B
+
+        # return parameters
+        print("Best-fit Heap's Law parameters E(m) = Km^B (K,B) = ", (K, B))
+        print("Heap's Law model accessible as <corpus>.heaps(m)")
+        return (K, B)
+
+    #
+    def heaps(self, m:int) -> int:
+        '''Runs best-fit Heap's Law model to predict n_types = E(m_tokens)'''
+
+        # assumes model has been fitted
+        K, B = self.heaps_K, self.heaps_B
+        E_m = np.round(K * np.power(m, B))
+
+        # return
+        return E_m
+
+    # infinite series model with coefficients determined by legomena vector k
+    # eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
+    def iseries(self, m:int) -> int:
+        '''Runs infinite series model to predict N = E(M)'''
+
+        # sum over legomena coefficients k
+        m = np.array(m)
+        x = m / self.M
+        exponents = range(len(self.k))
+        terms = np.array([ np.power(1 - x, n) for n in exponents ])
+        k_0 = np.dot(self.k, terms)
+        E_x = np.round(self.N - k_0)
+
+        # return
+        return E_x
