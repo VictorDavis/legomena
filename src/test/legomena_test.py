@@ -8,7 +8,7 @@ import unittest
 
 from legomena import Corpus
 
-GRAPHICS_ON = True
+GRAPHICS_ON = False
 
 # display test name
 def print_test_name():
@@ -64,9 +64,9 @@ class LegomenaTest(unittest.TestCase):
 
             # log-log graph of Heap's Model
             slope, intercept = B, np.log(K)
-            heaps_predictions = [ slope * x + intercept for x in df.log_m ]
-            plt.scatter(df.log_m, df.log_n)
-            plt.plot(df.log_m, heaps_predictions, color = "red")
+            heaps_predictions = [ slope * np.log(m) + intercept for m in df.m_tokens ]
+            plt.scatter(np.log(df.m_tokens), np.log(df.n_types))
+            plt.plot(np.log(df.m_tokens), heaps_predictions, color = "red")
             plt.title("Heap's Model (K,B) = (%f, %f)" % (K,B))
             plt.xlabel("log(tokens)")
             plt.ylabel("log(types)")
@@ -90,10 +90,69 @@ class LegomenaTest(unittest.TestCase):
             plt.ylabel("types")
             plt.show()
 
+    # test legomena models
+    def test_legomena(self):
+        print_test_name()
+
+        # retrieve corpus from NLTK
+        filename = 'blake-poems.txt'
+        words = list(gutenberg.words(filename))
+
+        # initialize class
+        corpus = Corpus(words)
+
+        # calculate transformation matrix A_x
+        D = 5
+        A_0 = np.array([ [ int(i == 0) for j in range(D)] for i in range(D) ])
+        A_1 = np.array([ [ int(i == j) for j in range(D)] for i in range(D) ])
+        assert np.array_equal(corpus.transformationMatrix(0.0, D), A_0)
+        assert np.array_equal(corpus.transformationMatrix(1.0, D), A_1)
+        print( corpus.transformationMatrix(0.5, D) )
+
+        # transform k to k'
+        assert np.array_equal(corpus.transform(1), corpus.k) # sample 100% of the corpus and assert k'=k
+        k_0 = corpus.transform(0) # k'(0) = [N, 0, 0, 0, ..., 0]
+        assert k_0[0] == corpus.N
+        assert sum(k_0) == corpus.N
+
+        # build n-legomena curves
+        corpus.buildTTRCurve(seed = 42, legomena_upto = 5)
+        df = corpus.TTR
+
+        # generate predictions
+        m_choices = df.m_tokens           # counts
+        x_choices = m_choices / corpus.M  # proportions
+        k_matrix  = np.array([ corpus.transform(x) for x in x_choices ])
+
+        # draw pretty pictures
+        if GRAPHICS_ON:
+            import matplotlib.pyplot as plt
+
+            # predicted hapaxes
+            predictions = k_matrix[:, 1]
+            realization = df.lego_1
+            plt.scatter(df.m_tokens, realization)
+            plt.plot(df.m_tokens, predictions, color = "red")
+            plt.title("Hapax-Token Relation")
+            plt.xlabel("tokens")
+            plt.ylabel("hapaxes")
+            plt.show()
+
+            # predicted hapaxes proportions
+            predictions = k_matrix[:, 1] / (corpus.N - k_matrix[:, 0])
+            realization = df.lego_1 / df.n_types
+            plt.scatter(df.m_tokens, realization)
+            plt.plot(df.m_tokens, predictions, color = "red")
+            plt.title("Hapax-Token Relation (fraction)")
+            plt.xlabel("tokens")
+            plt.ylabel("hapax fraction")
+            plt.show()
+
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(LegomenaTest('test_basic'))
     suite.addTest(LegomenaTest('test_models'))
+    suite.addTest(LegomenaTest('test_legomena'))
     return suite
 
 

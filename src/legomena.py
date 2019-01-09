@@ -1,6 +1,7 @@
 
 # bloody dependencies
 from collections import Counter, namedtuple
+from scipy.misc import comb as nCr
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -34,6 +35,7 @@ class Corpus:
         print("Number of tokens (<corpus>.M):", self.M)
         print("Number of types  (<corpus>.N):", self.N)
         print("Legomena vector  (<corpus>.k):", self.k[:9])
+        print("Frequency distribution accessible as <corpus>.fdist")
 
     #
     def getFrequencyDistribution(self, tokens:list = None, normalized:bool = False) -> dict:
@@ -48,18 +50,18 @@ class Corpus:
             tokens = self.tokens
 
         # calculate frequency distribution
-        fdist = Counter(self.tokens)
+        fdist = Counter(tokens)
         fdist = dict(fdist)
 
         # return
-        print("Frequency distribution accessible as <corpus>.fdist")
         return fdist
 
     #
-    def getLegoVectorK(self, fdist:dict = None) -> np.ndarray:
+    def getLegoVectorK(self, fdist:dict = None, relative_to:list = None) -> np.ndarray:
         '''
         Computes the frequency distribution *of* a frequency distribution.
-        Ex: k(banana) -> {a:3, n:2, b:1} -> {0:0, 1:1, 2:1, 3:1} -> (0, 1, 1, 1)
+        Ex: k(banana) -> k({a:3, n:2, b:1}) -> {0:0, 1:1, 2:1, 3:1} -> (0, 1, 1, 1)
+            - relative_to: Pass "mother" list of tokens for a count for k_0 = number of types *not* in found
         '''
 
         # pre-calculated k-vector of corpus
@@ -84,8 +86,11 @@ class Corpus:
         k = df.astype({"kn":int}).kn.values
         k = np.array(k)
 
+        # impute k[0] = the number of types *not* found in the distribution
+        k[0] = self.N - sum(k)
+        # assert len( set(self.tokens) - set(fdist.keys()) ) == k[0] # definition
+
         # return vector
-        print("Legomena counts accessible as <corpus>.k")
         return k
 
     #
@@ -144,11 +149,12 @@ class Corpus:
         return self.nlegomena(1)
 
     #
-    def buildTTRCurve(self, seed:int = None) -> pd.DataFrame:
+    def buildTTRCurve(self, seed:int = None, legomena_upto:int = None) -> pd.DataFrame:
         '''
         Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
         curve consisting of points (m, n)
             - seed: (optional) Set a random seed for reproduceability
+            - legomena_upto: (optional) include n-legomena counts up to given limit
         '''
 
         # set random seed
@@ -158,19 +164,34 @@ class Corpus:
         m_choices = [ int((x+1) * self.M / self.res) for x in range(self.res) ]
         TTR = []
         for m_tokens in m_choices:
+
+            # count types & tokens in random sample of size <m_tokens>
             tokens = np.random.choice(self.tokens, m_tokens, replace = False)
             n_types = self.countTypes(tokens)
-            TTR.append((m_tokens, n_types))
+            row_tuple = [m_tokens, n_types]
+
+            # calculate legomena k-vector expression of tokens sample
+            if legomena_upto is not None:
+                fdist   = self.getFrequencyDistribution(tokens)
+                lego_k  = self.getLegoVectorK(fdist)
+                lego_k  = lego_k[:legomena_upto] # only care about n < upto
+                pad_width = legomena_upto - len(lego_k)
+                if pad_width > 0: # i.e. len(k) < upto
+                    lego_k = np.pad(lego_k, (0, pad_width), mode = 'constant') # pad with zeros
+                row_tuple += list(lego_k)
+
+            # append row
+            row_tuple = tuple(row_tuple)
+            TTR.append(row_tuple)
 
         # save to self.TTR as dataframe
-        self.TTR = pd.DataFrame(TTR, columns = ["m_tokens", "n_types"])
-
-        # annotate for log-log plotting & for fitting Heap's Law
-        self.TTR["log_m"] = np.log(self.TTR.m_tokens)
-        self.TTR["log_n"] = np.log(self.TTR.n_types)
+        colnames = ["m_tokens", "n_types"]
+        if legomena_upto is not None:
+            colnames += [ "lego_" + str(x) for x in range(legomena_upto) ]
+        self.TTR = pd.DataFrame(TTR, columns = colnames)
 
         # return
-        print("Type-Token Relation curve accessible as <corpus>.TTR")
+        print("Type-Token Relation data accessible as <corpus>.TTR")
         return self.TTR
 
     #
@@ -180,8 +201,10 @@ class Corpus:
         # use linear regression to fit K, B to TTR data on a log/log scale
         df = self.TTR
         model = LinearRegression()
-        X_values = df.log_m.values.reshape(-1, 1)
-        model.fit(X = X_values, y = df.log_n)
+        log_m = np.log(df.m_tokens.values)
+        log_n = np.log(df.n_types.values)
+        X_values = log_m.reshape(-1, 1)
+        model.fit(X = X_values, y = log_n)
         B = model.coef_[0]
         K = np.exp(model.intercept_)
         self.heaps_K, self.heaps_B = K, B
@@ -217,3 +240,34 @@ class Corpus:
 
         # return
         return E_x
+
+    #
+    def transformationMatrix(self, x:float, D:int) -> np.ndarray:
+        '''Creates a transformation matrix A which operates on k to simulate sampling.'''
+
+        # matrix definition
+        x = float(x)
+        x_ = 1. - x
+        i = np.arange(D)
+        A_x = np.array([ nCr(i, j) * x**j * x_**(i-j) for j in range(D) ])
+        A_x = np.nan_to_num(A_x) # ignore nans
+
+        # return A_x matrix
+        return A_x
+
+    #
+    def transform(self, x:float) -> np.ndarray:
+        '''
+        Transforms legomena vector k into k' by operating on it by transformation matrix Ax,
+        where A(x) = [a_xij] for x the sampling proportion. In English, sampling proportion x
+        of a corpus expressible as k results in a smaller corpus expressible as k'
+        '''
+
+        # calculate A_x
+        D = len(self.k)
+        A_x = self.transformationMatrix(x, D)
+
+        # transform k
+        k  = self.k
+        k_ = np.dot(A_x, k)
+        return k_
