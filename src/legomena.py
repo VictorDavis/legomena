@@ -271,3 +271,114 @@ class Corpus:
         k  = self.k
         k_ = np.dot(A_x, k)
         return k_
+
+    # apply new log formula y = f(x) for proportions y,x in [0,1]
+    def log_formula(self, x:float):
+        '''
+        Applies the normalized sublinear growth x -> y formula [0,1] -> [0,1]
+        Types = N_z * log_formula(Tokens / M_z)
+        Returns:
+            - E_x: Expected proportion of types for given proportion of tokens x
+            - k_frac: Expected proportions of n-legomena for n = 0 to 5
+        '''
+
+        EPS = 1e-3
+        D   = 6
+        x   = x.reshape(-1)
+        k_frac = np.zeros((len(x), D))
+        logx  = np.log(x)
+        x2, x3, x4, x5, x6 = [ x**i for i in range(2, D+1) ]
+        E_x   = logx*x/(x-1)
+        k_frac[:,0] = (x - logx*x - 1)/(x-1)
+        k_frac[:,1] = (x2 - logx*x - x)/(x-1)**2
+        k_frac[:,2] = (x3 - 2*logx*x2 - x)/2/(x-1)**3
+        k_frac[:,3] = (2*x4 - 6*logx*x3 + 3*x3 - 6*x2 + x)/6/(x-1)**4
+        k_frac[:,4] = (3*x5 - 12*logx*x4 + 10*x4 - 18*x3 + 6*x2 - x)/12/(x-1)**5
+        k_frac[:,5] = (12*x6 - 60*logx*x5 + 65*x5 - 120*x4 + 60*x3 - 20*x2 + 3*x)/60/(x-1)**6
+
+        # return proportions
+        return E_x, k_frac
+
+    # predicts number of n-legomena based on input (m) and free parameters (Mz,Nz)
+    def predict(self, m_tokens:int, M_z:int = None, N_z:int = None):
+        '''
+        Applies the log formula to predict number of types as a function of tokens.
+            - m_tokens: Number of tokens
+            - M_z, N_z: Number of tokens, types of an optimum sample (model parameters)
+        Returns:
+            - E_m: Expected number of types given m tokens
+            - k: (array) Expected n-legomena counts for n = 0 to 5
+        '''
+
+        # default to fitted params
+        if M_z is None:
+            M_z = self.M_z
+        if N_z is None:
+            N_z = self.N_z
+
+        # scale down to normalized log formula
+        x = np.array(m_tokens) / M_z
+        E_x, k_frac = self.log_formula(x)
+        E_m = np.round(N_z * E_x)
+        k   = np.round(N_z * k_frac)
+
+        # de-vectorize if only one point was passed
+        if len(E_m) == 1:
+            E_m = E_m[0]
+            k   = k.reshape(-1)
+
+        # return scaled up predictions
+        return E_m, k
+
+    # At what sample size do the n-legomena counts most closely resemble a perfect Zipf Distribution?
+    # When 1/ln(x)+1/(1-x) = h_obs for h_obs the observed proportion of hapaxes
+    # Note: Because of the nature of this function, Newton's Method is not ideal.
+    #       Instead, we use a binary search to find f(x)-h_obs = 0, which
+    #       works nicely since f(x) decreases monotonically from 0 to inf
+    def inverse_h(self, h_obs):
+        '''Solves 1/ln(x)+1/(1-x) = h_obs for x given h_obs'''
+
+        x_prev = 0
+        x      = .99
+        dx     = .5
+        timer  = 1
+        EPS    = 1e-8 # ~27 iterations
+        while (dx > EPS) & (timer < 999):
+            if (x == 0) | (x == 1): # f(x) can't be evaluated @0,1
+                x += EPS # jigger x slightly
+            fx = 1/np.log(x) + 1/(1-x) # f(x)
+            if fx > h_obs:# if f(x) > h_obs then x is too low
+                if x + dx == x_prev:
+                    dx = dx/2
+                x_prev = x
+                x += dx
+            elif fx < h_obs: # if f(x) < h_obs then x is too high
+                if (x - dx == x_prev):
+                    dx = dx/2
+                while x - dx <= 0: # do not let x go negative
+                    dx = dx/2
+                x_prev = x
+                x -= dx
+            else: # if f(x) = h_obs then x is just right
+                # print(f"Found x in {timer} iterations")
+                return x
+            timer += 1
+            # print(f"(x, f(x)) = ({x}, {fx})")
+        # print(f"Found x = {x} in {timer} iterations.")
+        return x
+
+    # find M_z, N_z
+    def fit(self):
+        '''Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.'''
+
+        # infer z from h_obs
+        h_obs = self.k[1] / self.N      # observed hapax frac
+        z     = self.inverse_h(h_obs)   # inferred corpus:optimum ratio
+        M_z   = self.M / z
+        N_z   = self.N * (z-1) / z / np.log(z)
+        M_z, N_z = int(M_z), int(N_z)
+
+        # return optimum sample size M_z, N_z
+        self.M_z, self.N_z = M_z, N_z
+        print("Log model accessible as <corpus>.M_z, .N_z")
+        return M_z, N_z
