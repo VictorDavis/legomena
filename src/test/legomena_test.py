@@ -109,18 +109,19 @@ class LegomenaTest(unittest.TestCase):
 
         # calculate transformation matrix A_x
         D = 5
-        A_0 = np.array([ [ int(i == 0) for j in range(D)] for i in range(D) ])
-        A_1 = np.array([ [ int(i == j) for j in range(D)] for i in range(D) ])
+        A_0 = np.concatenate((np.ones(D).reshape(1, D), np.zeros((D-1, D))), axis = 0)
+        A_1 = np.identity(D)
         assert np.array_equal(corpus.transformationMatrix(0.0, D), A_0)
         assert np.array_equal(corpus.transformationMatrix(1.0, D), A_1)
         print( "A(0.5) = \n", corpus.transformationMatrix(0.5, D) )
 
-        # transform k to k' (NOTE: conputationally, transform matrix can only handle 256x256 dimension)
-        k_ = corpus.transform(1)
-        assert np.array_equal(k_[:256], corpus.k[:256]) # sample 100% of the corpus and assert k'=k
+        # transform k to k'
+        # NOTE: conputationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
         k_0 = corpus.transform(0) # k'(0) = [N, 0, 0, 0, ..., 0]
-        assert int(sum(k_0)) == corpus.N
-        assert (k_0/corpus.N)[0] > 0.99
+        k_1 = corpus.transform(1) # k'(1) = [0, k1, k2, k3, ...]
+        assert np.array_equal(k_1, corpus.k) # sample 100% of the corpus and assert k'=k
+        assert all(k_0[1:] == 0)
+        assert k_0[0] == corpus.N
 
         # build n-legomena curves
         corpus.buildTTRCurve(seed = 42, legomena_upto = 5)
@@ -129,7 +130,9 @@ class LegomenaTest(unittest.TestCase):
         # generate predictions
         m_choices = df.m_tokens           # counts
         x_choices = m_choices / corpus.M  # proportions
-        k_matrix  = np.array([ corpus.transform(x) for x in x_choices ])
+        k_matrix  = corpus.transform(x_choices)
+        k_matrix2 = np.array([ corpus.transform(x) for x in x_choices ])
+        assert np.allclose(k_matrix, k_matrix2)
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -192,8 +195,8 @@ class LegomenaTest(unittest.TestCase):
         # generate single prediction
         E_m, k = corpus.predict(corpus.M)
         assert abs(E_m - corpus.N) <= 1
-        assert RMSE_pct(df.lego_1.max(), k[1]) < 0.01
-        assert RMSE_pct(df.lego_2.max(), k[2]) < 0.05
+        assert RMSE_pct(df.lego_1.max(), k[1]) < 0.001
+        assert RMSE_pct(df.lego_2.max(), k[2]) < 0.005
 
         # generate vector of predictions
         E_m, k = corpus.predict(df.m_tokens)
@@ -234,10 +237,10 @@ class LegomenaTest(unittest.TestCase):
 
 def suite():
     suite = unittest.TestSuite()
-    # suite.addTest(LegomenaTest('test_basic'))
-    # suite.addTest(LegomenaTest('test_spgc'))
-    # suite.addTest(LegomenaTest('test_models'))
-    # suite.addTest(LegomenaTest('test_legomena'))
+    suite.addTest(LegomenaTest('test_basic'))
+    suite.addTest(LegomenaTest('test_spgc'))
+    suite.addTest(LegomenaTest('test_models'))
+    suite.addTest(LegomenaTest('test_legomena'))
     suite.addTest(LegomenaTest('test_optimization'))
     return suite
 
