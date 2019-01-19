@@ -3,8 +3,10 @@
 from collections import Counter, namedtuple
 from scipy.misc import comb as nCr
 import numpy as np
+import os
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+import zipfile
 
 # main class
 class Corpus:
@@ -242,15 +244,31 @@ class Corpus:
         return E_x
 
     #
-    def transformationMatrix(self, x:float, D:int) -> np.ndarray:
-        '''Creates a transformation matrix A which operates on k to simulate sampling.'''
+    def transformationMatrix(self, x:float, D:int, mask = None) -> np.ndarray:
+        '''Creates a transformation matrix A (of dimension DxD) which operates on k to simulate sampling.'''
+
+        # max dimension 256
+        D = min(D, 256)
 
         # matrix definition
         x = float(x)
         x_ = 1. - x
-        i = np.arange(D)
-        A_x = np.array([ nCr(i, j) * x**j * x_**(i-j) for j in range(D) ])
-        A_x = np.nan_to_num(A_x) # ignore nans
+        vec_range  = np.arange(D)
+        mat_horz   = np.meshgrid(vec_range, np.ones(D))[0]
+        mat_vert   = np.meshgrid(np.ones(D), np.arange(D))[1]
+        mat_nCr    = nCr(mat_horz, mat_vert) # nCr(i, j)
+        vec_xrange = x**np.arange(D)
+        mat_xvert  = np.meshgrid(np.ones(D), vec_xrange)[1] # x**j
+        mat_triu   = np.triu(mat_horz - mat_vert)
+        mat_xtriu  = np.triu(x_**mat_triu) # x_**(i-j)
+        mat_nCr    = np.nan_to_num(mat_nCr)
+        mat_xvert  = np.nan_to_num(mat_xvert)
+        mat_xtriu  = np.nan_to_num(mat_xtriu)
+        mat_x_x    = mat_xvert * mat_xtriu
+        mat_x_x    = np.nan_to_num(mat_x_x)
+        A_x        = mat_nCr * mat_x_x
+        # A_x = np.array([ nCr(i, j) * x**j * x_**(i-j) for j in range(D) ])
+        # A_x = np.nan_to_num(A_x) # ignore nans
 
         # return A_x matrix
         return A_x
@@ -266,10 +284,22 @@ class Corpus:
         # calculate A_x
         D = len(self.k)
         A_x = self.transformationMatrix(x, D)
+        D = A_x.shape[0]
 
         # transform k
-        k  = self.k
+        k  = self.k[:D]
         k_ = np.dot(A_x, k)
+
+        # NOTE: max A_x dimension = 256x256 for computational reasons, therefore impute tail with
+        #       smooth uniform remainder of expectations
+        pad = len(self.k) - D
+        err = self.N - sum(k_)
+        eps = err / pad
+        padding = np.array([ eps ] * pad)
+        k_ = np.concatenate((k_, padding))
+        assert int(sum(k_)) == self.N
+
+        # return transformed vector
         return k_
 
     # apply new log formula y = f(x) for proportions y,x in [0,1]
@@ -382,3 +412,28 @@ class Corpus:
         self.M_z, self.N_z = M_z, N_z
         print("Log model accessible as <corpus>.M_z, .N_z")
         return M_z, N_z
+
+# wrapper class for retrieving corpus from Standard Project Gutenberg Corpus
+class SPGC:
+
+    # get corpus by Project Gutenberg book ID
+    def get(pgid):
+
+        # extract contents of "counts" text file
+        SPGC  = "SPGC-counts-2018-07-18"
+        fname = f"{SPGC}/PG{pgid}_counts.txt"
+        z = zipfile.ZipFile(f"../../data/{SPGC}.zip")
+        z.extract(fname, "./")
+        z.close()
+        df = pd.read_csv(fname, header = -1, delimiter = "\t")
+        os.remove(fname)
+        os.rmdir(SPGC)
+
+        # reconstruct "bag of words" from counts
+        df.columns = ["word", "freq"]
+        nested_list = [ [row.word] * row.freq for idx, row in df.iterrows() ]
+        words = [ word for sub_list in nested_list for word in sub_list ]
+        corpus = Corpus(words)
+
+        # return corpus object
+        return corpus
