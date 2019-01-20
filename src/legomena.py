@@ -497,3 +497,17 @@ class SPGC:
 
         # return corpus object
         return corpus
+
+    # get SPGC metadata from csv
+    def getMeta():
+        '''Retrieves metadata.csv and returns as dataframe.'''
+
+        # read csv
+        df = pd.read_csv(f"../../data/SPGC-metadata-2018-07-18.csv")
+
+        # strip out "sound" entries
+        df = df[df.type == "Text"]
+        assert df.shape == (56466, 9)
+
+        # return
+        return df

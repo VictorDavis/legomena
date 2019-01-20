@@ -4,23 +4,31 @@ import inspect
 from nltk.corpus import gutenberg
 import numpy as np
 import os
+import pandas as pd
 from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
 from legomena import Corpus, SPGC
 
-GRAPHICS_ON = True
+GRAPHICS_ON = False
 PGID = 2701 # moby dick
 
 # display test name
 def print_test_name():
     print("\n"+inspect.stack()[1][3]+"\n", end='', flush=True)
 
-# root mean squared error as a percent of realization
+# standard error
+def std_err(y:float, y_hat:float):
+    return abs(y_hat - y) / y
+
+# root mean squared error as a percent of total types (normalized)
+# NOTE: y = realizations, y_hat = predictions
 def RMSE_pct(y, y_hat):
-    y = np.array(y).reshape(1)
-    y_hat = np.array(y_hat).reshape(1)
-    return np.sqrt(MSE(y, y_hat)) / y
+    y = np.array(y)
+    y_hat = np.array(y_hat)
+
+    # NOTE: real NRMSE formula does / ymax-ymin but in this application ymin ~= 0
+    return np.sqrt(MSE(y, y_hat)) / y.max()
 
 # unit tests
 class LegomenaTest(unittest.TestCase):
@@ -48,9 +56,82 @@ class LegomenaTest(unittest.TestCase):
 
     # ETL & sample SPGC data to generate legomena counts
     def test_spgc(self):
+        print_test_name()
 
         # retrieve Moby Dick from SPGC
         corpus = SPGC.get(PGID)
+        meta = SPGC.getMeta()
+
+        # NLTK-SPGC lookup
+        books = pd.DataFrame([
+            ("austen-emma.txt", 158),
+            ("austen-persuasion.txt", 105),
+            ("austen-sense.txt", 161),
+            ("bible-kjv.txt", 10),
+            ("blake-poems.txt", 574),
+            ("bryant-stories.txt", 473),
+            ("burgess-busterbrown.txt", 22816),
+            # ("carroll-alice.txt", 11),
+            ("chesterton-ball.txt", 5265),
+            ("chesterton-brown.txt", 223),
+            ("chesterton-thursday.txt", 1695),
+            ("edgeworth-parents.txt", 3655),
+            ("melville-moby_dick.txt", 2701),
+            ("milton-paradise.txt", 26),
+            ("shakespeare-caesar.txt", 1120),
+            ("shakespeare-hamlet.txt", 1122),
+            ("shakespeare-macbeth.txt", 1129),
+            ("whitman-leaves.txt", 1322)
+        ])
+        books.columns = ["NLTK_id", "SPGC_id"]
+
+        # build corpi from each source
+        corpi = {}
+        for book in books.itertuples():
+            print(f"\nLoading SPGC {book.SPGC_id}")
+            corpi[f"{book.SPGC_id}_SPGC"] = SPGC.get(book.SPGC_id)
+            print(f"\nLoading NLTK {book.NLTK_id}")
+            corpi[f"{book.NLTK_id}_NLTK"] = Corpus(list(gutenberg.words(book.NLTK_id)))
+
+        # fit TTR curve for all & compare RMSE
+        results = []
+        for corpus_name, corpus in corpi.items():
+            corpus.buildTTRCurve()
+
+            # fit log model
+            corpus.fit()
+            predictions, _ = corpus.predict(corpus.TTR.m_tokens)
+            realizations   = corpus.TTR.n_types
+            rmse = RMSE_pct(realizations, predictions)
+            print(f"RMSE for {corpus_name} is {rmse}.")
+
+            # fit heaps model
+            corpus.fitHeaps()
+            predictions = corpus.heaps(corpus.TTR.m_tokens)
+            rmse2 = RMSE_pct(realizations, predictions)
+
+            results.append((
+                corpus_name,
+                corpus.M,
+                corpus.N,
+                corpus.M_z,
+                corpus.N_z,
+                rmse,
+                corpus.heaps_K,
+                corpus.heaps_B,
+                rmse2
+            ))
+
+        # aggregate & analyze results
+        results = pd.DataFrame(results)
+        results.columns = ["name", "M", "N", "M_z", "N_z", "RMSE_pct", "K", "B", "RMSE_pct_heaps"]
+        results["source"] = [ name[-4:] for name in results.name]
+
+        print(results)
+        print("SPGC/Heaps avg error:", results[results.source == "SPGC"].RMSE_pct_heaps.mean())
+        print("NLTK/Heaps avg error:", results[results.source == "NLTK"].RMSE_pct_heaps.mean())
+        print("SPGC/Log   avg error:", results[results.source == "SPGC"].RMSE_pct.mean())
+        print("NLTK/Log   avg error:", results[results.source == "NLTK"].RMSE_pct.mean())
 
     # model-fitting tests
     def test_models(self):
@@ -194,9 +275,12 @@ class LegomenaTest(unittest.TestCase):
 
         # generate single prediction
         E_m, k = corpus.predict(corpus.M)
-        assert abs(E_m - corpus.N) <= 1
-        assert RMSE_pct(df.lego_1.max(), k[1]) < 0.001
-        assert RMSE_pct(df.lego_2.max(), k[2]) < 0.005
+        assert std_err(corpus.N, E_m)     < 0.0001
+        assert std_err(corpus.k[1], k[1]) < 0.001
+        assert std_err(corpus.k[2], k[2]) < 0.005
+        assert std_err(corpus.k[3], k[3]) < 0.05
+        assert std_err(corpus.k[4], k[4]) < 0.1
+        assert std_err(corpus.k[5], k[5]) < 0.1
 
         # generate vector of predictions
         E_m, k = corpus.predict(df.m_tokens)
