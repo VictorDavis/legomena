@@ -10,7 +10,7 @@ import unittest
 
 from legomena import Corpus, SPGC
 
-GRAPHICS_ON = False
+GRAPHICS_ON = True
 PGID = 2701 # moby dick
 
 # display test name

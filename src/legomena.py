@@ -8,6 +8,9 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 import zipfile
 
+# environment vars
+DATAPATH = os.getenv("DATAPATH", "../../data")
+
 # main class
 class Corpus:
 
@@ -482,14 +485,17 @@ class SPGC:
         # extract contents of "counts" text file
         SPGC  = "SPGC-counts-2018-07-18"
         fname = f"{SPGC}/PG{pgid}_counts.txt"
-        z = zipfile.ZipFile(f"../../data/{SPGC}.zip")
-        z.extract(fname, "./")
-        z.close()
-        df = pd.read_csv(fname, header = -1, delimiter = "\t")
-        os.remove(fname)
-        os.rmdir(SPGC)
+        z = zipfile.ZipFile(f"{DATAPATH}/{SPGC}.zip")
+        try:
+            fobj = z.open(fname)
+            z.close()
+        except Exception as e:
+            print(e)
+            z.close()
+            return None
 
         # reconstruct "bag of words" from counts
+        df = pd.read_csv(fobj, header = -1, delimiter = "\t")
         df.columns = ["word", "freq"]
         nested_list = [ [row.word] * row.freq for idx, row in df.iterrows() ]
         words = [ word for sub_list in nested_list for word in sub_list ]
@@ -503,11 +509,15 @@ class SPGC:
         '''Retrieves metadata.csv and returns as dataframe.'''
 
         # read csv
-        df = pd.read_csv(f"../../data/SPGC-metadata-2018-07-18.csv")
+        df = pd.read_csv(f"{DATAPATH}/SPGC-metadata-2018-07-18.csv")
 
         # strip out "sound" entries
         df = df[df.type == "Text"]
         assert df.shape == (56466, 9)
+
+        # key records by numeric PG ID
+        df.id = df.id.str.replace("PG", "")
+        df = df.set_index("id")
 
         # return
         return df

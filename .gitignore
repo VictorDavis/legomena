@@ -1,3 +1,10 @@
 
 # cache & compiled files
 __pycache__
+__init__.py
+
+# jupyter meta files
+*checkpoint*
+
+# don't commit full datafile
+SPGC-counts-2018-07-18.zip
