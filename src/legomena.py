@@ -5,6 +5,7 @@ from scipy.misc import comb as nCr
 import numpy as np
 import os
 import pandas as pd
+from scipy.optimize import fsolve, curve_fit
 from sklearn.linear_model import LinearRegression
 import zipfile
 
@@ -16,6 +17,7 @@ class Corpus:
 
     ## object properties
     tokens = None           # corpus under study, list of strings
+    types  = None           # lexicon, ranked order
     fdist  = None           # frequency distribution of tokens in corpus
     k      = None           # k-vector of n-legomena counts
     M      = None           # number of tokens in the corpus
@@ -27,7 +29,7 @@ class Corpus:
     _mat    = None          # internal cache for speeding up .transform() function
 
     #
-    def __init__(self, tokens:list):
+    def __init__(self, tokens:list, verbose:bool = True):
         '''Initializes handler class with a corpus as a list of tokens.'''
 
         # store passed tokens & pre-calculate a few items
@@ -35,13 +37,15 @@ class Corpus:
         self.M = self.countTokens()
         self.N = self.countTypes()
         self.fdist = self.getFrequencyDistribution()
+        self.types = list(self.fdist.keys())
         self.k = self.getLegoVectorK()
 
         # report
-        print("Number of tokens (<corpus>.M):", self.M)
-        print("Number of types  (<corpus>.N):", self.N)
-        print("Legomena vector  (<corpus>.k):", self.k[:9])
-        print("Frequency distribution accessible as <corpus>.fdist")
+        if verbose:
+            print("Number of tokens (<corpus>.M):", self.M)
+            print("Number of types  (<corpus>.N):", self.N)
+            print("Legomena vector  (<corpus>.k):", self.k[:9])
+            print("Frequency distribution accessible as <corpus>.fdist")
 
     #
     def getFrequencyDistribution(self, tokens:list = None, normalized:bool = False) -> dict:
@@ -180,11 +184,12 @@ class Corpus:
             if legomena_upto is not None:
                 fdist   = self.getFrequencyDistribution(tokens)
                 lego_k  = self.getLegoVectorK(fdist)
+                rank1   = len(lego_k) # frequency of most frequent token
                 lego_k  = lego_k[:legomena_upto] # only care about n < upto
                 pad_width = legomena_upto - len(lego_k)
                 if pad_width > 0: # i.e. len(k) < upto
                     lego_k = np.pad(lego_k, (0, pad_width), mode = 'constant') # pad with zeros
-                row_tuple += list(lego_k)
+                row_tuple += list(lego_k) + [rank1]
 
             # append row
             row_tuple = tuple(row_tuple)
@@ -194,6 +199,7 @@ class Corpus:
         colnames = ["m_tokens", "n_types"]
         if legomena_upto is not None:
             colnames += [ "lego_" + str(x) for x in range(legomena_upto) ]
+            colnames += [ "rank1" ]
         self.TTR = pd.DataFrame(TTR, columns = colnames)
 
         # return
@@ -368,6 +374,18 @@ class Corpus:
         EPS = 1e-3
         D   = 6
         x   = x.reshape(-1)
+
+        # initialize return vectors
+        _E_x    = np.zeros((len(x)))
+        _k_frac = np.zeros((len(x), D))
+
+        # two singularities @ x=0 & x=1
+        x_iszero = ( np.abs(x) < EPS ) # singularity @ x=0
+        x_isone  = ( np.abs(x-1.) < EPS ) # singularity @ x=1
+        x_isokay = ( ~np.logical_or(x_iszero, x_isone) )
+        x = x[x_isokay]
+
+        # initialize results
         k_frac = np.zeros((len(x), D))
         logx  = np.log(x)
         x2, x3, x4, x5, x6 = [ x**i for i in range(2, D+1) ]
@@ -379,8 +397,16 @@ class Corpus:
         k_frac[:,4] = (3*x5 - 12*logx*x4 + 10*x4 - 18*x3 + 6*x2 - x)/12/(x-1)**5
         k_frac[:,5] = (12*x6 - 60*logx*x5 + 65*x5 - 120*x4 + 60*x3 - 20*x2 + 3*x)/60/(x-1)**6
 
+        # limiting values @ x=0 & x=1
+        _E_x[x_iszero] = 0.
+        _k_frac[x_iszero,:] = np.zeros((D))
+        _E_x[x_isone] = 1.
+        _k_frac[x_isone,:] = 1./np.array([2,6,12,20,30,42])
+        _E_x[x_isokay] = E_x
+        _k_frac[x_isokay] = k_frac
+
         # return proportions
-        return E_x, k_frac
+        return _E_x, _k_frac
 
     # predicts number of n-legomena based on input (m) and free parameters (Mz,Nz)
     def predict(self, m_tokens:int, M_z:int = None, N_z:int = None):
@@ -413,56 +439,36 @@ class Corpus:
         # return scaled up predictions
         return E_m, k
 
-    # At what sample size do the n-legomena counts most closely resemble a perfect Zipf Distribution?
-    # When 1/ln(x)+1/(1-x) = h_obs for h_obs the observed proportion of hapaxes
-    # Note: Because of the nature of this function, Newton's Method is not ideal.
-    #       Instead, we use a binary search to find f(x)-h_obs = 0, which
-    #       works nicely since f(x) decreases monotonically from 0 to inf
-    def inverse_h(self, h_obs):
-        '''Solves 1/ln(x)+1/(1-x) = h_obs for x given h_obs'''
-
-        x_prev = 0
-        x      = .99
-        dx     = .5
-        timer  = 1
-        EPS    = 1e-8 # ~27 iterations
-        while (dx > EPS) & (timer < 999):
-            if (x == 0) | (x == 1): # f(x) can't be evaluated @0,1
-                x += EPS # jigger x slightly
-            fx = 1/np.log(x) + 1/(1-x) # f(x)
-            if fx > h_obs:# if f(x) > h_obs then x is too low
-                if x + dx == x_prev:
-                    dx = dx/2
-                x_prev = x
-                x += dx
-            elif fx < h_obs: # if f(x) < h_obs then x is too high
-                if (x - dx == x_prev):
-                    dx = dx/2
-                while x - dx <= 0: # do not let x go negative
-                    dx = dx/2
-                x_prev = x
-                x -= dx
-            else: # if f(x) = h_obs then x is just right
-                # print(f"Found x in {timer} iterations")
-                return x
-            timer += 1
-            # print(f"(x, f(x)) = ({x}, {fx})")
-        # print(f"Found x = {x} in {timer} iterations.")
-        return x
-
     # find M_z, N_z
-    def fit(self):
-        '''Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.'''
+    def fit(self, optimize:bool = False):
+        '''
+        Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
+            - optimize: (optional) Uses scipy.optimize.curve_fit() to refine initial fit.
+        '''
 
         # infer z from h_obs
         h_obs = self.k[1] / self.N      # observed hapax frac
-        z     = self.inverse_h(h_obs)   # inferred corpus:optimum ratio
+        func = lambda x : 1./np.log(x) + 1./(1.-x) - h_obs
+        z0 = 0.5
+        z = fsolve(func, z0)[0]
         M_z   = self.M / z
         N_z   = self.N * (z-1) / z / np.log(z)
         M_z, N_z = int(M_z), int(N_z)
+        self.M_z, self.N_z = M_z, N_z
+
+        # minimize MSE on random perturbations of M_z, N_z
+        if optimize:
+            if self.TTR is None:
+                print("To optimize, call <corpus>.buildTTRCurve() first.")
+            else:
+                func  = lambda m, M_z, N_z : N_z * np.log(m/M_z) * m/M_z / (m/M_z - 1)
+                xdata = self.TTR.m_tokens
+                ydata = self.TTR.n_types
+                params, _ = curve_fit(func, xdata, ydata, p0 = (M_z, N_z))
+                M_z, N_z = int(params[0]), int(params[1])
+                self.M_z, self.N_z = M_z, N_z
 
         # return optimum sample size M_z, N_z
-        self.M_z, self.N_z = M_z, N_z
         print("Log model accessible as <corpus>.M_z, .N_z")
         return M_z, N_z
 
