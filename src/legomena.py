@@ -37,7 +37,7 @@ class Corpus:
         self.M = self.countTokens()
         self.N = self.countTypes()
         self.fdist = self.getFrequencyDistribution()
-        self.types = list(self.fdist.keys())
+        self.types = self.fdist.type.values
         self.k = self.getLegoVectorK()
 
         # report
@@ -48,8 +48,8 @@ class Corpus:
             print("Frequency distribution accessible as <corpus>.fdist")
 
     #
-    def getFrequencyDistribution(self, tokens:list = None, normalized:bool = False) -> dict:
-        '''Takes a list of tokens and returns a dictionary of {token: count} pairs.'''
+    def getFrequencyDistribution(self, tokens:list = None, normalized:bool = False) -> pd.core.frame.DataFrame:
+        '''Takes a list of tokens and returns a dataframe of type/rank/frequency counts.'''
 
         # pre-calculated frequency distribution
         if tokens is None and self.fdist is not None:
@@ -62,12 +62,16 @@ class Corpus:
         # calculate frequency distribution
         fdist = Counter(tokens)
         fdist = dict(fdist)
+        fdist = pd.DataFrame.from_dict(fdist, orient = "index").reset_index()
+        fdist.columns = ["type", "freq"]
+        fdist.sort_values("freq", ascending = False, inplace = True)
+        fdist["rank"] = range(1, fdist.shape[0] + 1)
 
         # return
         return fdist
 
     #
-    def getLegoVectorK(self, fdist:dict = None, relative_to:list = None) -> np.ndarray:
+    def getLegoVectorK(self, fdist:pd.core.frame.DataFrame = None, relative_to:list = None) -> np.ndarray:
         '''
         Computes the frequency distribution *of* a frequency distribution.
         Ex: k(banana) -> k({a:3, n:2, b:1}) -> {0:0, 1:1, 2:1, 3:1} -> (0, 1, 1, 1)
@@ -82,23 +86,17 @@ class Corpus:
         if fdist is None:
             fdist = self.fdist
 
-        # encodes frequency distribution as a vector of n-legomena counts
-        fdist_vals = [ val for key, val in fdist.items() ]
-        fdist_n, fdist_kn = np.unique(fdist_vals, return_counts = True)
-
         # impute zeros for elements of k for which no words occur n times, including n=0
-        df = pd.DataFrame({"n": fdist_n, "kn": fdist_kn})
-        max_n = df.n.max()
-        df.set_index("n", inplace = True)
-        df_complete = pd.DataFrame(index = range(max_n + 1))
+        df = fdist.freq.value_counts().to_frame()
+        max_freq = df.index.max()
+        df_complete = pd.DataFrame(index = range(max_freq + 1))
         df = pd.concat([df_complete, df], axis = 1)
         df.fillna(0, inplace = True)
-        k = df.astype({"kn":int}).kn.values
+        k = df.astype({"freq":int}).freq.values
         k = np.array(k)
 
         # impute k[0] = the number of types *not* found in the distribution
         k[0] = self.N - sum(k)
-        # assert len( set(self.tokens) - set(fdist.keys()) ) == k[0] # definition
 
         # return vector
         return k
@@ -149,7 +147,8 @@ class Corpus:
         '''Returns list of tokens occurring exactly n times in the corpus.'''
 
         # all times occurring exactly n times
-        return [ type for type, freq in self.fdist.items() if freq == n ]
+        df = self.fdist
+        return df[df.freq == n].type.values
 
     #
     def hapaxes(self):

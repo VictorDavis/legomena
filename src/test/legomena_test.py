@@ -47,8 +47,8 @@ class LegomenaTest(unittest.TestCase):
         # sanity checks
         assert corpus.M == len(words)
         assert corpus.N == len(set(words))
-        assert sum(corpus.fdist.values()) == corpus.M
-        assert len(corpus.fdist) == corpus.N
+        assert corpus.fdist.freq.sum() == corpus.M
+        assert corpus.fdist.shape[0] == corpus.N
         hapaxes = corpus.hapaxes()
         assert corpus.k[0] == 0
         assert corpus.k[1] == len(hapaxes)
@@ -251,19 +251,6 @@ class LegomenaTest(unittest.TestCase):
 
         # initialize class
         corpus = Corpus(words) # SPGC.get(PGID)
-
-        # use observed hapax:type ratio to infer optimum
-        # NOTE: no sampling required to parametrize model
-        def function_h(x):
-            '''Expected hapax:type ratio for proportion x of an optimum sample.'''
-            return 1/np.log(x) + 1/(1-x)
-
-        np.random.seed(42)
-        h_space  = np.random.uniform(0.25, 0.75, 100)
-        EPS = 1e-8
-        for h_obs in h_space:
-            h_inverse = corpus.inverse_h(h_obs)
-            assert abs(function_h(h_inverse) - h_obs) < EPS
 
         # infer optimum sample size from observed hapax:type ratio
         corpus.fit()
