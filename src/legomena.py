@@ -372,7 +372,7 @@ class Corpus:
 
         EPS = 1e-3
         D   = 6
-        x   = x.reshape(-1)
+        x   = np.array(x).reshape(-1)
 
         # initialize return vectors
         _E_x    = np.zeros((len(x)))
@@ -398,9 +398,9 @@ class Corpus:
 
         # limiting values @ x=0 & x=1
         _E_x[x_iszero] = 0.
-        _k_frac[x_iszero,:] = np.zeros((D))
+        _k_frac[x_iszero,:] = np.array([1., 0., 0., 0., 0., 0.])
         _E_x[x_isone] = 1.
-        _k_frac[x_isone,:] = 1./np.array([2,6,12,20,30,42])
+        _k_frac[x_isone,:] = np.array([0., 1./2, 1./6, 1./12, 1./20, 1./30])
         _E_x[x_isokay] = E_x
         _k_frac[x_isokay] = k_frac
 
