@@ -159,6 +159,14 @@ class LegomenaTest(unittest.TestCase):
             "NLTK/Log   avg error:", results[results.source == "NLTK"].RMSE_pct.mean()
         )
 
+    # check SPGC failure message
+    def test_spgc_fail(self):
+        print_test_name()
+
+        # retrieve non-book id from SPGC
+        with self.assertRaises(Exception) as context:
+            corpus = SPGC.get(999999)
+
     # model-fitting tests
     def test_models(self):
         print_test_name()
@@ -339,6 +347,7 @@ def suite():
     suite = unittest.TestSuite()
     suite.addTest(LegomenaTest("test_basic"))
     suite.addTest(LegomenaTest("test_spgc"))
+    suite.addTest(LegomenaTest("test_spgc_fail"))
     suite.addTest(LegomenaTest("test_models"))
     suite.addTest(LegomenaTest("test_legomena"))
     suite.addTest(LegomenaTest("test_optimization"))

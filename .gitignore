@@ -7,4 +7,4 @@ __init__.py
 *checkpoint*
 
 # don't commit full datafile
-SPGC-counts-2018-07-18.zip
+*.zip

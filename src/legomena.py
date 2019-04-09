@@ -505,15 +505,23 @@ class SPGC:
 
         # extract contents of "counts" text file
         SPGC = "SPGC-counts-2018-07-18"
+        zname = f"{DATAPATH}/{SPGC}.zip"
         fname = f"{SPGC}/PG{pgid}_counts.txt"
-        z = zipfile.ZipFile(f"{DATAPATH}/{SPGC}.zip")
+        fobj = None
         try:
+            z = zipfile.ZipFile(zname)
             fobj = z.open(fname)
             z.close()
         except Exception as e:
-            print(e)
-            z.close()
-            return None
+            print(e)  # print but do not raise
+
+        # check for text file
+        if fobj is None:
+            try:
+                fobj = open(f"{DATAPATH}/{fname}")
+            except Exception as e:
+                print(e)
+                raise (e)
 
         # reconstruct "bag of words" from counts
         df = pd.read_csv(fobj, header=-1, delimiter="\t")
