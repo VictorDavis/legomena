@@ -1,6 +1,6 @@
 # bloody dependencies
 from collections import Counter, namedtuple
-from scipy.misc import comb as nCr
+from scipy.special import comb as nCr
 import numpy as np
 import os
 import pandas as pd
@@ -9,7 +9,7 @@ from sklearn.linear_model import LinearRegression
 import zipfile
 
 # environment vars
-DATAPATH = os.getenv("DATAPATH", "../../data")
+DATAPATH = os.getenv("DATAPATH", "data")
 
 # main class
 class Corpus:

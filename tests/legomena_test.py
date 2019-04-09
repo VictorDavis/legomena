@@ -7,9 +7,9 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
-from legomena import Corpus, SPGC
+from ..legomena import Corpus, SPGC
 
-GRAPHICS_ON = True
+GRAPHICS_ON = False
 PGID = 2701  # moby dick
 
 # display test name
