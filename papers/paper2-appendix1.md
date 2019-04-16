@@ -179,28 +179,28 @@ Soln: RSolve[{R[1] == (-x + x^2 - x Log[x])/(-1 + x), R[1 + n] == -(x/(n (1 + n)
 $$
 R_n
 = \frac{x-1}{n} - \frac{x-1}{x}\phi\bigg( \frac{x-1}{x}, 1, n+1 \bigg) \\
-= \frac{x-1}{n} - z\phi(z, 1, n+1) \\
-= \frac{x-1}{n} - z\sum_{k=0}^\infty \frac{z^k}{n+1+k} \\
-= \frac{x-1}{n} - \sum_{k=0}^\infty \frac{z^{k+1}}{n+k+1} \\
-= \frac{x-1}{n} - \sum_{k=1}^\infty \frac{z^k}{n+k} \\
-= \frac{x-1}{n} - \frac{z}{n+1} - \frac{z^2}{n+2} - \frac{z^3}{n+3} - \frac{z^4}{n+4} - ... \\
+= \frac{z}{n(1-z)} - z\phi(z, 1, n+1) \\
+= \frac{z}{n(1-z)} - z\sum_{k=0}^\infty \frac{z^k}{n+1+k} \\
+= \frac{z}{n(1-z)} - \sum_{k=0}^\infty \frac{z^{k+1}}{n+k+1} \\
+= \frac{z}{n(1-z)} - \sum_{k=1}^\infty \frac{z^k}{n+k} \\
+= \frac{z}{n(1-z)} - \frac{z}{n+1} - \frac{z^2}{n+2} - \frac{z^3}{n+3} - \frac{z^4}{n+4} - ... \\
 $$
 
 $$
 R_1
-= \frac{x-1}{1} - \frac{z}{2} - \frac{z^2}{3} - \frac{z^3}{4} - \bold{\frac{z^4}{5}} - \frac{z^5}{6}- \frac{z^6}{7}- \frac{z^7}{8} - ... \\
+= \frac{z}{1(1-z)} - \frac{z}{2} - \frac{z^2}{3} - \frac{z^3}{4} - \bold{\frac{z^4}{5}} - \frac{z^5}{6}- \frac{z^6}{7}- \frac{z^7}{8} - ... \\
 
 R_2
-= \frac{x-1}{2} - \frac{z}{3} - \frac{z^2}{4} - \bold{\frac{z^3}{5}} - \frac{z^4}{6} - \frac{z^5}{7}- \frac{z^6}{8}- \frac{z^7}{9} - ... \\
+= \frac{z}{2(1-z)} - \frac{z}{3} - \frac{z^2}{4} - \bold{\frac{z^3}{5}} - \frac{z^4}{6} - \frac{z^5}{7}- \frac{z^6}{8}- \frac{z^7}{9} - ... \\
 
 R_3
-= \frac{x-1}{3} - \frac{z}{4} - \bold{\frac{z^2}{5}} - \frac{z^3}{6} - \frac{z^4}{7} - \frac{z^5}{8}- \frac{z^6}{9}- \frac{z^7}{10} - ... \\
+= \frac{z}{3(1-z)} - \frac{z}{4} - \bold{\frac{z^2}{5}} - \frac{z^3}{6} - \frac{z^4}{7} - \frac{z^5}{8}- \frac{z^6}{9}- \frac{z^7}{10} - ... \\
 
 R_4
-= \frac{x-1}{4} - \bold{\frac{z}{5}} - \frac{z^2}{6} - \frac{z^3}{7} - \frac{z^4}{8} - \frac{z^5}{9}- \frac{z^6}{10}- \frac{z^7}{11} - ... \\
+= \frac{z}{4(1-z)} - \bold{\frac{z}{5}} - \frac{z^2}{6} - \frac{z^3}{7} - \frac{z^4}{8} - \frac{z^5}{9}- \frac{z^6}{10}- \frac{z^7}{11} - ... \\
 
 R_5
-= \bold{\frac{x-1}{5}} - \frac{z}{6} - \frac{z^2}{7} - \frac{z^3}{8} - \frac{z^4}{9} - \frac{z^5}{10}- \frac{z^6}{11}- \frac{z^7}{12} - ...
+= \bold{\frac{z}{5(1-z)}} - \frac{z}{6} - \frac{z^2}{7} - \frac{z^3}{8} - \frac{z^4}{9} - \frac{z^5}{10}- \frac{z^6}{11}- \frac{z^7}{12} - ...
 $$
 
 
@@ -208,17 +208,17 @@ $$
 Now, we can sum over $n$. (Note the bolded diagonalization of the summation.)
 $$
 \sum_{n=1}^\infty R_n
-= \sum_{n=1}^\infty \frac{x-1}{n} - \sum_{k=1}^\infty \frac{z^k}{n+k} \\
-= \sum_{n=1}^\infty \frac{x-1}{n} - \frac{1}{n}\sum_{k=1}^{n-1} z^k \\
-= \sum_{n=1}^\infty \frac{x-1}{n} - \frac{z}{n}\sum_{k=1}^{n-1} z^{k-1} \\
-= \sum_{n=1}^\infty \frac{x-1}{n} - \frac{z}{n}\sum_{k=0}^{n-2} z^k \\
-= \sum_{n=1}^\infty \frac{x-1}{n} - \frac{z}{n}\frac{1-z^{n-1}}{1-z} \\
-= \sum_{n=1}^\infty \frac{x-1}{n} - \frac{x-1}{n}(1-z^{n-1}) \\
-= \sum_{n=1}^\infty \frac{x-1}{n}(1 - (1 - z^{n-1}) ) \\
-= \sum_{n=1}^\infty \frac{x-1}{n}z^{n-1} \\
-= \sum_{n=1}^\infty \frac{xz}{n}z^{n-1} \\
-= x\sum_{n=1}^\infty \frac{z^n}{n} \\
-= x\ln\bigg(\frac{1}{1-z}\bigg) \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \sum_{k=1}^\infty \frac{z^k}{n+k} \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \frac{1}{n}\sum_{k=1}^{n-1} z^k \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \frac{z}{n}\sum_{k=1}^{n-1} z^{k-1} \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \frac{z}{n}\sum_{k=0}^{n-2} z^k \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \frac{z}{n}\frac{1-z^{n-1}}{1-z} \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)} - \frac{z}{n(1-z)}(1-z^{n-1}) \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)}(1 - (1 - z^{n-1}) ) \\
+= \sum_{n=1}^\infty \frac{z}{n(1-z)}z^{n-1} \\
+= \sum_{n=1}^\infty \frac{1}{1-z}\frac{z^n}{n} \\
+= \frac{1}{1-z}\sum_{n=1}^\infty \frac{z^n}{n} \\
+= \frac{1}{1-z}\ln\bigg(\frac{1}{1-z}\bigg) \\
 = x\ln x \\
 = -I_0
 $$
@@ -234,3 +234,4 @@ $$
 = 1+\frac{I_0}{x-1} - \frac{I_0}{x-1}
 = 1
 $$
+
