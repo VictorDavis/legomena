@@ -46,6 +46,103 @@ class HeapsModel:
         return n_types
 
 
+class KTransformer:
+    """Matrix operator which transforms k(x) = A_x*k(1)"""
+
+    @classmethod
+    def A_x(cls, x: float, D: int, mask=None) -> np.ndarray:
+        """
+        Creates a transformation matrix A (of dimension DxD) which operates on k to simulate sampling.
+            x: float between 0 and 1
+            D: desired dimension of matrix A = DxD
+            mask: (optional) to save memory (~10x, depending), ignore matrix elements corresponding to zeros in the k-vector
+        """
+
+        # horizontal/vertical indices
+        mat_horz = np.repeat(np.arange(D).reshape(1, D), D, axis=0)  # i
+        mat_vert = np.repeat(np.arange(D).reshape(D, 1), D, axis=1)  # j
+        mat_triu = mat_horz - mat_vert  # i-j
+
+        # coerce into upper triangular
+        mat_vert = np.triu(mat_vert)
+        mat_triu = np.triu(mat_triu)
+
+        # now reduce matrix considerably along input axis for zero-elements of k-vector
+        if mask is not None:
+            mat_horz = mat_horz[:, mask]
+            mat_vert = mat_vert[:, mask]
+            mat_triu = mat_triu[:, mask]
+
+        # compute pascal's matrix
+        mat_pasc = nCr(mat_horz, mat_vert)  # nCr(i, j)
+        if mask is None:
+            mat_pasc = np.triu(mat_pasc)
+        else:
+            mat_pasc_sq = np.zeros((D, D))
+            mat_pasc_sq[:, mask] = mat_pasc
+            mat_pasc_sq = np.triu(mat_pasc_sq)
+            mat_pasc = mat_pasc_sq[:, mask]
+
+        # assume infinite values will be zeroed out -- TODO: check?
+        mat_pasc[np.isinf(mat_pasc)] = 0
+        assert np.isinf(mat_pasc).sum() == 0
+
+        # verify dimensions
+        D_ = D if mask is None else sum(mask)
+        assert mat_vert.shape == (D, D_)
+        assert mat_triu.shape == (D, D_)
+        assert mat_pasc.shape == (D, D_)
+
+        # add x into the recipe
+        x = np.array(x)
+        x_ = 1.0 - x
+
+        # support 1-dim argument for x
+        xdim = np.ndim(x)
+        assert xdim in [0, 1]  # scalar or 1-D array
+        if xdim == 1:
+            R = x.shape[0]
+            mat_vert = np.repeat(mat_vert[:, :, np.newaxis], R, axis=2)
+            mat_triu = np.repeat(mat_triu[:, :, np.newaxis], R, axis=2)
+            mat_pasc = np.repeat(mat_pasc[:, :, np.newaxis], R, axis=2)
+
+        # calculate exponents and combine
+        mat_xvert = np.power(x, mat_vert)  # x^j
+        mat_xtriu = np.power(x_, mat_triu)  # x_^(i-j)
+        mat_xprod = mat_xvert * mat_xtriu  # x^j * x_^(i-j)
+        A_x = mat_pasc * mat_xprod  # nCr(i, j) * x^j * x_^(i-j)
+
+        # coerce matrix shape to ( # of x elements, # of k elements, # of non-zero k elements )
+        if xdim == 1:
+            A_x = np.moveaxis(A_x, 2, 0)
+            assert A_x.shape == (R, D, D_)
+        else:
+            assert A_x.shape == (D, D_)
+
+        # return
+        return A_x
+
+    @classmethod
+    def transform(cls, k: np.ndarray, x: float) -> np.ndarray:
+        """
+        Transforms legomena vector k into k' by operating on it by transformation matrix Ax,
+        where A(x) = [a_xij] for x the sampling proportion. In English, sampling proportion x
+        of a corpus expressible as k results in a smaller corpus expressible as k'
+        """
+
+        # calculate A_x
+        mask = k > 0
+        D = len(k)
+        A_x = cls.A_x(x, D, mask)
+
+        # transform k
+        k = k[mask]
+        k_ = np.dot(A_x, k)
+
+        # return transformed vector
+        return k_
+
+
 # main class
 class Corpus:
 
@@ -58,7 +155,6 @@ class Corpus:
     N = None  # number of types in the corpus
     res = 100  # number of samples to take when building a TTR curve
     TTR = None  # dataframe containing type/token counts from corpus samples
-    _mat = None  # internal cache for speeding up .transform() function
 
     #
     def __init__(self, tokens: list, verbose: bool = True):
@@ -260,110 +356,6 @@ class Corpus:
 
         # return
         return E_x
-
-    #
-    def transformationMatrix(self, x: float, D: int, mask=None) -> np.ndarray:
-        """
-        Creates a transformation matrix A (of dimension DxD) which operates on k to simulate sampling.
-            x: float between 0 and 1
-            D: desired dimension of matrix A = DxD
-            mask: (optional) to save memory (~10x, depending), ignore matrix elements corresponding to zeros in the k-vector
-        """
-
-        # cache elements of the calculation invariant to x
-        if (self._mat is None) or (D != len(self.k)):
-
-            # horizontal/vertical indices
-            mat_horz = np.repeat(np.arange(D).reshape(1, D), D, axis=0)  # i
-            mat_vert = np.repeat(np.arange(D).reshape(D, 1), D, axis=1)  # j
-            mat_triu = mat_horz - mat_vert  # i-j
-
-            # coerce into upper triangular
-            mat_vert = np.triu(mat_vert)
-            mat_triu = np.triu(mat_triu)
-
-            # now reduce matrix considerably along input axis for zero-elements of k-vector
-            if mask is not None:
-                mat_horz = mat_horz[:, mask]
-                mat_vert = mat_vert[:, mask]
-                mat_triu = mat_triu[:, mask]
-
-            # compute pascal's matrix
-            mat_pasc = nCr(mat_horz, mat_vert)  # nCr(i, j)
-            if mask is None:
-                mat_pasc = np.triu(mat_pasc)
-            else:
-                mat_pasc_sq = np.zeros((D, D))
-                mat_pasc_sq[:, mask] = mat_pasc
-                mat_pasc_sq = np.triu(mat_pasc_sq)
-                mat_pasc = mat_pasc_sq[:, mask]
-
-            # assume infinite values will be zeroed out -- TODO: check?
-            mat_pasc[np.isinf(mat_pasc)] = 0
-            assert np.isinf(mat_pasc).sum() == 0
-
-            # cache
-            if D == len(self.k):
-                self._mat = {"vert": mat_vert, "triu": mat_triu, "pasc": mat_pasc}
-        else:
-            mat_vert = self._mat["vert"]
-            mat_triu = self._mat["triu"]
-            mat_pasc = self._mat["pasc"]
-
-        # verify dimensions
-        D_ = D if mask is None else sum(mask)
-        assert mat_vert.shape == (D, D_)
-        assert mat_triu.shape == (D, D_)
-        assert mat_pasc.shape == (D, D_)
-
-        # add x into the recipe
-        x = np.array(x)
-        x_ = 1.0 - x
-
-        # support 1-dim argument for x
-        xdim = np.ndim(x)
-        assert xdim in [0, 1]  # scalar or 1-D array
-        if xdim == 1:
-            R = x.shape[0]
-            mat_vert = np.repeat(mat_vert[:, :, np.newaxis], R, axis=2)
-            mat_triu = np.repeat(mat_triu[:, :, np.newaxis], R, axis=2)
-            mat_pasc = np.repeat(mat_pasc[:, :, np.newaxis], R, axis=2)
-
-        # calculate exponents and combine
-        mat_xvert = np.power(x, mat_vert)  # x^j
-        mat_xtriu = np.power(x_, mat_triu)  # x_^(i-j)
-        mat_xprod = mat_xvert * mat_xtriu  # x^j * x_^(i-j)
-        A_x = mat_pasc * mat_xprod  # nCr(i, j) * x^j * x_^(i-j)
-
-        # coerce matrix shape to ( # of x elements, # of k elements, # of non-zero k elements )
-        if xdim == 1:
-            A_x = np.moveaxis(A_x, 2, 0)
-            assert A_x.shape == (R, D, D_)
-        else:
-            assert A_x.shape == (D, D_)
-
-        # return
-        return A_x
-
-    #
-    def transform(self, x: float) -> np.ndarray:
-        """
-        Transforms legomena vector k into k' by operating on it by transformation matrix Ax,
-        where A(x) = [a_xij] for x the sampling proportion. In English, sampling proportion x
-        of a corpus expressible as k results in a smaller corpus expressible as k'
-        """
-
-        # calculate A_x
-        D = len(self.k)
-        mask = self.k > 0
-        A_x = self.transformationMatrix(x, D, mask)
-
-        # transform k
-        k = self.k[mask]
-        k_ = np.dot(A_x, k)
-
-        # return transformed vector
-        return k_
 
     # apply new log formula y = f(x) for proportions y,x in [0,1]
     def log_formula(self, x: float):

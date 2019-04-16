@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
-from ..legomena import Corpus, SPGC, HeapsModel
+from ..legomena import Corpus, SPGC, HeapsModel, KTransformer
 
 GRAPHICS_ON = True
 PGID = 2701  # moby dick
@@ -231,14 +231,14 @@ class LegomenaTest(unittest.TestCase):
         D = 5
         A_0 = np.concatenate((np.ones(D).reshape(1, D), np.zeros((D - 1, D))), axis=0)
         A_1 = np.identity(D)
-        assert np.array_equal(corpus.transformationMatrix(0.0, D), A_0)
-        assert np.array_equal(corpus.transformationMatrix(1.0, D), A_1)
-        print("A(0.5) = \n", corpus.transformationMatrix(0.5, D))
+        assert np.array_equal(KTransformer.A_x(0.0, D), A_0)
+        assert np.array_equal(KTransformer.A_x(1.0, D), A_1)
+        print("A(0.5) = \n", KTransformer.A_x(0.5, D))
 
         # transform k to k'
         # NOTE: conputationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
-        k_0 = corpus.transform(0)  # k'(0) = [N, 0, 0, 0, ..., 0]
-        k_1 = corpus.transform(1)  # k'(1) = [0, k1, k2, k3, ...]
+        k_0 = KTransformer.transform(corpus.k, 0)  # k'(0) = [N, 0, 0, 0, ..., 0]
+        k_1 = KTransformer.transform(corpus.k, 1)  # k'(1) = [0, k1, k2, k3, ...]
         assert np.array_equal(
             k_1, corpus.k
         )  # sample 100% of the corpus and assert k'=k
@@ -252,9 +252,7 @@ class LegomenaTest(unittest.TestCase):
         # generate predictions
         m_choices = df.m_tokens  # counts
         x_choices = m_choices / corpus.M  # proportions
-        k_matrix = corpus.transform(x_choices)
-        k_matrix2 = np.array([corpus.transform(x) for x in x_choices])
-        assert np.allclose(k_matrix, k_matrix2)
+        k_matrix = KTransformer.transform(corpus.k, x_choices)
 
         # draw pretty pictures
         if GRAPHICS_ON:
