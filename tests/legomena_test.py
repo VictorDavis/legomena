@@ -7,9 +7,9 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
-from ..legomena import Corpus, SPGC
+from ..legomena import Corpus, SPGC, HeapsModel
 
-GRAPHICS_ON = False
+GRAPHICS_ON = True
 PGID = 2701  # moby dick
 
 # display test name
@@ -101,17 +101,20 @@ class LegomenaTest(unittest.TestCase):
         results = []
         for corpus_name, corpus in corpi.items():
             corpus.buildTTRCurve()
+            m_tokens = corpus.TTR.m_tokens.values
+            n_types = corpus.TTR.n_types.values
 
             # fit log model
             corpus.fit()
-            predictions, _ = corpus.predict(corpus.TTR.m_tokens)
-            realizations = corpus.TTR.n_types
+            predictions, _ = corpus.predict(m_tokens)
+            realizations = n_types
             rmse = RMSE_pct(realizations, predictions)
             print(f"RMSE for {corpus_name} is {rmse}.")
 
             # fit heaps model
-            corpus.fitHeaps()
-            predictions = corpus.heaps(corpus.TTR.m_tokens)
+            model = HeapsModel()
+            heaps = model.fit(m_tokens, n_types)
+            predictions = model.predict(m_tokens)
             rmse2 = RMSE_pct(realizations, predictions)
 
             results.append(
@@ -122,8 +125,8 @@ class LegomenaTest(unittest.TestCase):
                     corpus.M_z,
                     corpus.N_z,
                     rmse,
-                    corpus.heaps_K,
-                    corpus.heaps_B,
+                    heaps.K,
+                    heaps.B,
                     rmse2,
                 )
             )
@@ -177,10 +180,13 @@ class LegomenaTest(unittest.TestCase):
         # build TTR curve
         corpus.buildTTRCurve(seed=42)
         df = corpus.TTR
+        m_tokens = df.m_tokens.values
+        n_types = df.n_types.values
 
         # fit Heap's Law model to TTR curve
-        corpus.fitHeaps()
-        K, B = corpus.heaps_K, corpus.heaps_B
+        model = HeapsModel()
+        K, B = model.fit(m_tokens, n_types)
+        predictions = model.predict(m_tokens)
         # assert corpus.heaps(1000) == 789
 
         # draw pretty pictures
@@ -188,19 +194,18 @@ class LegomenaTest(unittest.TestCase):
             import matplotlib.pyplot as plt
 
             # log-log graph of Heap's Model
-            slope, intercept = B, np.log(K)
-            heaps_predictions = [slope * np.log(m) + intercept for m in df.m_tokens]
-            plt.scatter(np.log(df.m_tokens), np.log(df.n_types))
-            plt.plot(np.log(df.m_tokens), heaps_predictions, color="red")
-            plt.title("Heap's Model (K,B) = (%f, %f)" % (K, B))
+            plt.scatter(df.m_tokens, df.n_types)
+            plt.plot(df.m_tokens, predictions, color="red")
+            plt.title(f"Heap's Model (K,B) = ({K:0.4f}, {B:0.4f})")
+            plt.xscale("log")
+            plt.yscale("log")
             plt.xlabel("log(tokens)")
             plt.ylabel("log(types)")
             plt.show()
 
             # normal graph of Heap's Model
-            heaps_predictions = corpus.heaps(df.m_tokens)
             plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, heaps_predictions, color="red")
+            plt.plot(df.m_tokens, predictions, color="red")
             plt.title("Heap's Model (K,B) = (%f, %f)" % (K, B))
             plt.xlabel("tokens")
             plt.ylabel("types")

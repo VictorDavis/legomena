@@ -11,6 +11,41 @@ import zipfile
 # environment vars
 DATAPATH = os.getenv("DATAPATH", "data")
 
+
+class HeapsModel:
+    """Heap's Law: N=KM**B"""
+
+    # params
+    HeapsParams = namedtuple("HeapsParams", ("K", "B"))
+    params = HeapsParams(0.0, 0.0)
+
+    def fit(self, m_tokens, n_types):
+        """
+        Naive fit: Linear regression on logN = B*logM + expK
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        """
+
+        # convert to log/log
+        log_m = np.log(m_tokens).reshape(-1, 1)
+        log_n = np.log(n_types)
+        model = LinearRegression()
+        model.fit(X=log_m, y=log_n)
+        K = np.exp(model.intercept_)
+        B = model.coef_[0]
+        self.params = self.HeapsParams(K, B)
+        return self.params
+
+    def predict(self, m_tokens):
+        """
+        Calculate & return n_types = E(m_tokens) = Km**B
+        :param m_tokens: Number of tokens, list-like independent variable
+        """
+        K, B = self.params
+        n_types = np.round(K * np.power(m_tokens, B))
+        return n_types
+
+
 # main class
 class Corpus:
 
@@ -23,8 +58,6 @@ class Corpus:
     N = None  # number of types in the corpus
     res = 100  # number of samples to take when building a TTR curve
     TTR = None  # dataframe containing type/token counts from corpus samples
-    heaps_K = None  # best-fit Heap's coefficient N = KM^B
-    heaps_B = None  # best-fit Heap's exponent N = KM^B
     _mat = None  # internal cache for speeding up .transform() function
 
     #
@@ -211,37 +244,6 @@ class Corpus:
         # return
         print("Type-Token Relation data accessible as <corpus>.TTR")
         return self.TTR
-
-    #
-    def fitHeaps(self) -> LinearRegression:
-        """Finds best-fit (K,B) parameters for Heaps Law"""
-
-        # use linear regression to fit K, B to TTR data on a log/log scale
-        df = self.TTR
-        model = LinearRegression()
-        log_m = np.log(df.m_tokens.values)
-        log_n = np.log(df.n_types.values)
-        X_values = log_m.reshape(-1, 1)
-        model.fit(X=X_values, y=log_n)
-        B = model.coef_[0]
-        K = np.exp(model.intercept_)
-        self.heaps_K, self.heaps_B = K, B
-
-        # return parameters
-        print("Best-fit Heap's Law parameters E(m) = Km^B (K,B) = ", (K, B))
-        print("Heap's Law model accessible as <corpus>.heaps(m)")
-        return (K, B)
-
-    #
-    def heaps(self, m: int) -> int:
-        """Runs best-fit Heap's Law model to predict n_types = E(m_tokens)"""
-
-        # assumes model has been fitted
-        K, B = self.heaps_K, self.heaps_B
-        E_m = np.round(K * np.power(m, B))
-
-        # return
-        return E_m
 
     # infinite series model with coefficients determined by legomena vector k
     # eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
