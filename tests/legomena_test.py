@@ -9,13 +9,8 @@ import unittest
 
 from ..legomena import Corpus, SPGC, HeapsModel, KTransformer
 
-GRAPHICS_ON = True
+GRAPHICS_ON = False
 PGID = 2701  # moby dick
-
-# display test name
-def print_test_name():
-    print("\n" + inspect.stack()[1][3] + "\n", end="", flush=True)
-
 
 # standard error
 def std_err(y: float, y_hat: float):
@@ -37,28 +32,31 @@ class LegomenaTest(unittest.TestCase):
 
     # initialize Legomena class with small corpus & assert simple stats match
     def test_basic(self):
-        print_test_name()
 
         # retrieve corpus from NLTK
         filename = "blake-poems.txt"
         words = list(gutenberg.words(filename))
 
         # initialize class
-        corpus = Corpus(words)
+        corpus = Corpus.from_tokens(words)
 
         # sanity checks
         assert corpus.M == len(words)
         assert corpus.N == len(set(words))
         assert corpus.fdist.freq.sum() == corpus.M
         assert corpus.fdist.shape[0] == corpus.N
-        hapaxes = corpus.hapaxes()
+        hapaxes = corpus.hapax
         assert corpus.k[0] == 0
         assert corpus.k[1] == len(hapaxes)
         assert sum(corpus.k) == corpus.N
 
+        # no infinite loop
+        corpus = Corpus()
+        with self.assertRaises(AssertionError) as context:
+            corpus.summary()
+
     # ETL & sample SPGC data to generate legomena counts
     def test_spgc(self):
-        print_test_name()
 
         # retrieve Moby Dick from SPGC
         corpus = SPGC.get(PGID)
@@ -95,12 +93,12 @@ class LegomenaTest(unittest.TestCase):
             print(f"\nLoading SPGC {book.SPGC_id}")
             corpi[f"{book.SPGC_id}_SPGC"] = SPGC.get(book.SPGC_id)
             print(f"\nLoading NLTK {book.NLTK_id}")
-            corpi[f"{book.NLTK_id}_NLTK"] = Corpus(list(gutenberg.words(book.NLTK_id)))
+            words = list(gutenberg.words(book.NLTK_id))
+            corpi[f"{book.NLTK_id}_NLTK"] = Corpus.from_tokens(words)
 
         # fit TTR curve for all & compare RMSE
         results = []
         for corpus_name, corpus in corpi.items():
-            corpus.buildTTRCurve()
             m_tokens = corpus.TTR.m_tokens.values
             n_types = corpus.TTR.n_types.values
 
@@ -164,7 +162,6 @@ class LegomenaTest(unittest.TestCase):
 
     # check SPGC failure message
     def test_spgc_fail(self):
-        print_test_name()
 
         # retrieve non-book id from SPGC
         with self.assertRaises(Exception) as context:
@@ -172,13 +169,12 @@ class LegomenaTest(unittest.TestCase):
 
     # model-fitting tests
     def test_models(self):
-        print_test_name()
 
         # initialize class
         corpus = SPGC.get(PGID)
 
         # build TTR curve
-        corpus.buildTTRCurve(seed=42)
+        corpus.seed = 42
         df = corpus.TTR
         m_tokens = df.m_tokens.values
         n_types = df.n_types.values
@@ -222,7 +218,6 @@ class LegomenaTest(unittest.TestCase):
 
     # test legomena models
     def test_legomena(self):
-        print_test_name()
 
         # initialize class
         corpus = SPGC.get(PGID)
@@ -246,7 +241,8 @@ class LegomenaTest(unittest.TestCase):
         assert k_0[0] == corpus.N
 
         # build n-legomena curves
-        corpus.buildTTRCurve(seed=42, legomena_upto=5)
+        corpus.dimension = 5
+        corpus.seed = 42
         df = corpus.TTR
 
         # generate predictions
@@ -280,7 +276,6 @@ class LegomenaTest(unittest.TestCase):
 
     # functions for finding optimum sample size M_z, N_z
     def test_optimization(self):
-        print_test_name()
 
         # retrieve corpus from NLTK
         filename = "melville-moby_dick.txt"
@@ -289,14 +284,15 @@ class LegomenaTest(unittest.TestCase):
         # TODO: Why SPGC model quality suffers relative to NLTK ?
 
         # initialize class
-        corpus = Corpus(words)  # SPGC.get(PGID)
+        corpus = Corpus.from_tokens(words)  # SPGC.get(PGID)
 
         # infer optimum sample size from observed hapax:type ratio
         corpus.fit()
         M_z, N_z = corpus.M_z, corpus.N_z
 
         # measure E(x), k(x) and compare
-        corpus.buildTTRCurve(seed=42, legomena_upto=5)
+        corpus.dimension = 5
+        corpus.seed = 42
         df = corpus.TTR
 
         # generate single prediction
@@ -344,22 +340,3 @@ class LegomenaTest(unittest.TestCase):
             plt.xlabel("tokens")
             plt.ylabel("dis legomena fraction")
             plt.show()
-
-
-def suite():
-    suite = unittest.TestSuite()
-    suite.addTest(LegomenaTest("test_basic"))
-    suite.addTest(LegomenaTest("test_spgc"))
-    suite.addTest(LegomenaTest("test_spgc_fail"))
-    suite.addTest(LegomenaTest("test_models"))
-    suite.addTest(LegomenaTest("test_legomena"))
-    suite.addTest(LegomenaTest("test_optimization"))
-    return suite
-
-
-# run the aforementioned suite
-if __name__ == "__main__":
-    print("\n----------------------------Legomena Tests---------------------------")
-    print("----------At the end of each: dot stands for OK, E for ERROR----------")
-    runner = unittest.TextTestRunner()
-    runner.run(suite())
