@@ -45,6 +45,7 @@ class HeapsModel:
         Naive fit: Linear regression on logN = B*logM + expK
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
+        :returns: Heap's Law parameters, as tuple
         """
 
         # convert to log/log
@@ -57,10 +58,11 @@ class HeapsModel:
         self.params = (K, B)
         return self.params
 
-    def predict(self, m_tokens: np.ndarray):
+    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
         Calculate & return n_types = E(m_tokens) = Km**B
         :param m_tokens: Number of tokens, list-like independent variable
+        :returns: Number of types as predicted by Heap's Law
         """
 
         # allow scalar
@@ -84,10 +86,12 @@ class KTransformer:
     @classmethod
     def A_x(cls, x: float, dim: int, mask=None) -> np.ndarray:
         """
-        Creates a transformation matrix A (of dimension DxD) which operates on k to simulate sampling.
+        Creates a transformation matrix A (of dimension dim^2) which operates on k to simulate sampling.
+        NOTE: Eqn (12) in https://arxiv.org/pdf/1901.00521.pdf
         :param x: float between 0 and 1
-        :param dim: desired dimension of matrix A = DxD
+        :param dim: desired dimension of matrix A = dim^2
         :param mask: (optional) to save memory (~10x, depending), ignore matrix elements corresponding to zeros in the k-vector
+        :returns: Transformation matrix A_x
         """
 
         # horizontal/vertical indices
@@ -162,6 +166,7 @@ class KTransformer:
         of a corpus expressible as k results in a smaller corpus expressible as k'
         :param k: The k-vector to transform
         :param x: The matrix parameter for A_x
+        :returns: The transformed k-vector
         """
 
         # calculate A_x
@@ -177,13 +182,10 @@ class KTransformer:
         return k_
 
 
-class Corpus:
+class Corpus(Counter):
     """Wrapper class for logarithmic competitor model to Heap's Law"""
 
     # object properties
-    _tokens = None  # corpus under study, list of strings
-    _types = None  # lexicon, ranked order
-    _fdist = None  # frequency distribution of tokens in corpus
     _k = None  # k-vector of n-legomena counts
     _TTR = None  # dataframe containing type/token counts from corpus samples
 
@@ -205,61 +207,47 @@ class Corpus:
     @property
     def tokens(self) -> list:
         """The bag of words, list-like of elements of any type."""
-        if self._tokens is None:
-            assert self._fdist is not None, "No tokens!"
-            self._tokens = self._compute_tokens()
-        return self._tokens
-
-    @tokens.setter
-    def tokens(self, tokens_: list):
-        self._tokens = tokens_
-        self._types = None
-        self._fdist = None
-        self._k = None
-        self._TTR = None
-        self._params = None
+        tokens_ = list(self.elements())
+        return tokens_
 
     @property
     def types(self) -> list:
         """The lexicon, ranked by frequency."""
-        if self._types is None:
-            self._types = self._compute_types()
-        return self._types
+        fdist = self.fdist  # ranked order
+        types_ = list(fdist.type.values)
+        return types_
 
     @property
     def fdist(self) -> pd.DataFrame:
         """The frequency distribution, as a dataframe."""
-        if self._fdist is None:
-            assert self._tokens is not None, "No frequency distribution!"
-            self._fdist = self._compute_fdist()
-        return self._fdist
-
-    @fdist.setter
-    def fdist(self, fdist_: pd.DataFrame):
-        fdist_.columns = ["word", "freq"]
-        self._fdist = fdist_
-        self._tokens = None
-        self._types = None
-        self._k = None
-        self._TTR = None
-        self._params = None
+        df = pd.DataFrame.from_dict(self, orient="index").reset_index()
+        df.columns = ["type", "freq"]
+        df = df.sort_values("freq", ascending=False).reset_index(drop=True)
+        return df
 
     @property
     def k(self) -> np.ndarray:
         """The vector describing the frequency of n-legomena."""
         if self._k is None:
-            self._k = self._compute_k()
-        return self._k
+            self._k = Counter(self.values())
+
+        # return as array
+        k = self._k
+        kmax = max(k.keys())
+        karr = np.array([k[i] for i in range(kmax + 1)])
+        return karr
 
     @property
     def M(self) -> int:
         """The number of tokens in the corpus."""
-        return self._compute_M()
+        m_tokens = sum(self.values())
+        return m_tokens
 
     @property
     def N(self) -> int:
         """The number of types in the corpus."""
-        return self._compute_N()
+        n_types = len(self)
+        return n_types
 
     @property
     def options(self) -> UserOptions:
@@ -344,135 +332,17 @@ class Corpus:
         """The number of types in this corpus's optimum sample."""
         return self.params.N_z
 
-    @classmethod
-    def from_tokens(cls, tokens_: list, verbose: bool = True):
-        """
-        Initialize class with a corpus as a list of tokens.
-        :param tokens_: List-like collection of tokens.
-        """
-        ret = cls()
-        ret.tokens = tokens_
-        if verbose:
-            ret.summary()
-        return ret
-
-    @classmethod
-    def from_fdist(cls, fdist_: pd.DataFrame, verbose: bool = True):
-        """
-        No original text available. Instead, reconstruct 'bag of words'
-        from a frequency distribution dataframe. (Order doesn't matter.)
-        :param fdist_: 2-column dataframe formatted as [word:str, freq:int]
-        """
-        ret = cls()
-        ret.fdist = fdist_
-        if verbose:
-            ret.summary()
-        return ret
-
     def summary(self):
         """Print some basic information about this corpus."""
         print("Number of tokens (<corpus>.M):", self.M)
         print("Number of types  (<corpus>.N):", self.N)
         print("Legomena vector  (<corpus>.k):", self.k[:9])
-        print("Frequency distribution accessible as <corpus>.fdist")
-
-    def _compute_tokens(self) -> list:
-        """Reconstruct an unordered 'bag of words' from a frequency distribution."""
-
-        # retrieve frequency distribution
-        fdist_ = self.fdist
-
-        # extrapolate as list of tokens
-        # TODO: speed up
-        nested_list = [[row.word] * row.freq for idx, row in fdist_.iterrows()]
-        tokens = [word for sub_list in nested_list for word in sub_list]
-        return tokens
-
-    #
-    def _compute_fdist(self) -> pd.DataFrame:
-        """Compute a dataframe of type/rank/frequency counts."""
-
-        # retrieve tokens
-        tokens = self.tokens
-
-        # calculate frequency distribution
-        fdist = Counter(tokens)
-        fdist = dict(fdist)
-        fdist = pd.DataFrame.from_dict(fdist, orient="index").reset_index()
-        fdist.columns = ["type", "freq"]
-        fdist.sort_values("freq", ascending=False, inplace=True)
-        fdist = fdist.reset_index(drop=True)
-        fdist.index.name = "rank"
-
-        # return
-        return fdist
-
-    #
-    def _compute_k(self) -> np.ndarray:
-        """
-        Compute the frequency distribution *of* a frequency distribution.
-        Ex: k(banana) -> k({a:3, n:2, b:1}) -> {0:0, 1:1, 2:1, 3:1} -> (0, 1, 1, 1)
-        """
-
-        # retrieve frequency distribution
-        fdist = self.fdist
-
-        # impute zeros for elements of k for which no words occur n times, including n=0
-        df = fdist.freq.value_counts().to_frame()
-        max_freq = df.index.max()
-        df_complete = pd.DataFrame(index=range(max_freq + 1))
-        df = pd.concat([df_complete, df], axis=1)
-        df.fillna(0, inplace=True)
-        k = df.astype({"freq": int}).freq.values
-        k = np.array(k)
-
-        # impute k[0] = the number of types *not* found in the distribution
-        k[0] = self.N - sum(k)
-
-        # return vector
-        return k
-
-    def _compute_M(self):
-        """Compute the number of tokens in the corpus."""
-        return self.fdist.freq.sum()
-
-    @staticmethod
-    def _count_types(tokens: list):
-        """Count the number of distinct types in given list of tokens."""
-        # NOTE: np.unique() faster than set(x)
-        return len(np.unique(tokens))
-
-    def _compute_N(self):
-        """Compute the number of types in the corpus."""
-        return len(self.fdist)
-
-    def _compute_types(self):
-        """Computes the ranked order of types in the corpus."""
-
-        # retrieve frequency distribution
-        fdist_ = self.fdist
-
-        # return types
-        types_ = fdist.type.values
-        return types_
-
-    #
-    def minicorpus(self, n: int):
-        """Returns (kn,k)-minicorpus, list of all words occurring exactly n times."""
-
-        # list of n-legomena
-        nlegomena = self.nlegomena(n)
-
-        # all occurrences of n-legomena
-        return [token for token in tokens if token in nlegomena]
 
     #
     def nlegomena(self, n: int):
         """List of types occurring exactly n times in the corpus."""
-
-        # all types occurring exactly n times
-        df = self.fdist
-        return df[df.freq == n].type.values
+        nlegomena_ = [typ for typ, freq in self.items() if freq == n]
+        return nlegomena_
 
     @property
     def hapax(self):
@@ -510,6 +380,9 @@ class Corpus:
         # user options
         res, dim, seed, eps = self.options
 
+        # retrieve/reconstruct tokens
+        tokens = self.tokens
+
         # set random seed
         np.random.seed(seed)
 
@@ -519,15 +392,16 @@ class Corpus:
         for m_tokens in m_choices:
 
             # count types & tokens in random sample of size <m_tokens>
-            # TODO: speed this up
-            tokens = np.random.choice(self.tokens, m_tokens, replace=False)
-            n_types = self._count_types(tokens)
+            # NOTE: WITHOUT REPLACEMENT
+            subtokens = np.random.choice(tokens, m_tokens, replace=False)
+            mini_ = Corpus(subtokens)
+            n_types = mini_.N
             row_tuple = [m_tokens, n_types]
 
             # calculate legomena k-vector expression of tokens sample
             if dim is not None:
-                fdist = self.fdist
-                lego_k = self.k
+                lego_k = mini_.k
+                lego_k[0] = self.N - mini_.N
                 rank1 = len(lego_k)  # frequency of most frequent token
                 lego_k = lego_k[:dim]  # only care about n < upto
                 pad_width = dim - len(lego_k)
@@ -546,16 +420,15 @@ class Corpus:
         if dim is not None:
             colnames += ["lego_" + str(x) for x in range(dim)]
             colnames += ["rank1"]
-        self._TTR = pd.DataFrame(TTR, columns=colnames)
+        df = pd.DataFrame(TTR, columns=colnames)
 
         # return
-        return self.TTR
+        return df
 
-    # infinite series model with coefficients determined by legomena vector k
-    # eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
     def iseries(self, m_tokens: np.ndarray) -> np.ndarray:
         """
         Runs infinite series model to predict N = E(M)
+        NOTE: Eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
         :param m: List-like independent variable m, the number of tokens
         :returns n: Array of dependent variables n, the number of types
         """
@@ -576,6 +449,7 @@ class Corpus:
         """
         Applies the normalized sublinear growth x -> y formula [0,1] -> [0,1]
         n_types = N_z * log_formula(m_tokens / M_z)
+        NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
         :param x: List-like independent variable x, the proportion of tokens
         :param epsilon: Returns limit value within +/- epsilon of singularity
         :param dim: Desired dimension of k-vector, highest n for which to return n-legomena
@@ -672,7 +546,7 @@ class Corpus:
         """
         Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
         :param optimize: (optional) Uses scipy.optimize.curve_fit() to refine initial fit.
-        :returns: LogParams
+        :returns: Logarithmic model parameters, as tuple
         """
 
         # infer z from h_obs
@@ -736,8 +610,9 @@ class SPGC:
                 raise (e)
 
         # build corpus from frequency distribution
-        fdist = pd.read_csv(fobj, header=-1, delimiter="\t")
-        corpus = Corpus.from_fdist(fdist)
+        df = pd.read_csv(fobj, header=-1, delimiter="\t")
+        asdict = {row[1]: row[2] for row in df.itertuples()}
+        corpus = Corpus(asdict)
 
         # return corpus object
         return corpus

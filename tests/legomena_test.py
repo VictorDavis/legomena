@@ -38,7 +38,7 @@ class LegomenaTest(unittest.TestCase):
         words = list(gutenberg.words(filename))
 
         # initialize class
-        corpus = Corpus.from_tokens(words)
+        corpus = Corpus(words)
 
         # sanity checks
         assert corpus.M == len(words)
@@ -49,11 +49,7 @@ class LegomenaTest(unittest.TestCase):
         assert corpus.k[0] == 0
         assert corpus.k[1] == len(hapaxes)
         assert sum(corpus.k) == corpus.N
-
-        # no infinite loop
-        corpus = Corpus()
-        with self.assertRaises(AssertionError) as context:
-            corpus.summary()
+        assert len(corpus.types) == corpus.N
 
     # ETL & sample SPGC data to generate legomena counts
     def test_spgc(self):
@@ -94,7 +90,7 @@ class LegomenaTest(unittest.TestCase):
             corpi[f"{book.SPGC_id}_SPGC"] = SPGC.get(book.SPGC_id)
             print(f"\nLoading NLTK {book.NLTK_id}")
             words = list(gutenberg.words(book.NLTK_id))
-            corpi[f"{book.NLTK_id}_NLTK"] = Corpus.from_tokens(words)
+            corpi[f"{book.NLTK_id}_NLTK"] = Corpus(words)
 
         # fit TTR curve for all & compare RMSE
         results = []
@@ -231,7 +227,7 @@ class LegomenaTest(unittest.TestCase):
         print("A(0.5) = \n", KTransformer.A_x(0.5, D))
 
         # transform k to k'
-        # NOTE: conputationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
+        # NOTE: computationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
         k_0 = KTransformer.transform(corpus.k, 0)  # k'(0) = [N, 0, 0, 0, ..., 0]
         k_1 = KTransformer.transform(corpus.k, 1)  # k'(1) = [0, k1, k2, k3, ...]
         assert np.array_equal(
@@ -284,7 +280,7 @@ class LegomenaTest(unittest.TestCase):
         # TODO: Why SPGC model quality suffers relative to NLTK ?
 
         # initialize class
-        corpus = Corpus.from_tokens(words)  # SPGC.get(PGID)
+        corpus = Corpus(words)  # SPGC.get(PGID)
 
         # infer optimum sample size from observed hapax:type ratio
         corpus.fit()
