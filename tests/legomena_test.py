@@ -99,7 +99,7 @@ class LegomenaTest(unittest.TestCase):
 
             # fit log model
             model = LogModel()
-            logs = model.fit(m_tokens, n_types, corpus.k[1])
+            logs = model.fit(m_tokens, n_types)
             predictions = model.predict(m_tokens)
             realizations = n_types
             rmse = RMSE_pct(realizations, predictions)
@@ -191,7 +191,7 @@ class LegomenaTest(unittest.TestCase):
 
         # fit logarithmic model to TTR curve
         model = LogModel()
-        params_logs = model.fit(m_tokens, n_types, corpus.k[1])
+        params_logs = model.fit(m_tokens, n_types)
         predictions_log = model.predict(m_tokens)
         assert model.predict(1000) == 519
 
@@ -326,7 +326,7 @@ class LegomenaTest(unittest.TestCase):
         # optimized predictions: worse fit at m=M, better fit overall
         E_m = model.predict(m_tokens)
         RMSE_before = RMSE_pct(n_types, E_m)
-        M_z, N_z = model.fit(m_tokens, n_types, hapax)
+        M_z, N_z = model.fit(m_tokens, n_types)
         E_m = model.predict(m_tokens)
         RMSE_after = RMSE_pct(n_types, E_m)
         assert RMSE_after < RMSE_before

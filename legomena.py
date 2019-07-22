@@ -1,11 +1,14 @@
 # bloody dependencies
 from collections import Counter, namedtuple
 import numpy as np
+import os
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
 from scipy.special import comb as nCr
 from scipy.stats import linregress
 import zipfile
+
+DATAPATH = os.getenv("DATAPATH", "data")
 
 
 class HeapsModel:
@@ -320,7 +323,7 @@ class LogModel:
         # return optimum sample size M_z, N_z
         return self.params
 
-    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray, h_hapax: int) -> LogParams:
+    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray) -> LogParams:
         """
         Uses scipy.optimize.curve_fit() to fit the log model to type-token data.
         :param m_tokens: Number of tokens, list-like independent variable
@@ -328,18 +331,16 @@ class LogModel:
         :returns: Logarithmic model parameters, as tuple
         """
 
-        # TODO: find initial guess without hapax
-
         # initial guess: naive fit
-        M0, N0 = self.fit_naive(max(m_tokens), max(n_types), h_hapax)
-        # M0, N0 = max(m_tokens), max(n_types)
+        M, N, H = max(m_tokens), max(n_types), max(n_types) / 2
+        p0 = self.fit_naive(M, N, H)
 
         # minimize MSE on random perturbations of M_z, N_z
         func = lambda m, M_z, N_z: N_z * np.log(m / M_z) * m / M_z / (m / M_z - 1)
         xdata = np.array(m_tokens)
         ydata = np.array(n_types)
-        params_, _ = curve_fit(func, xdata, ydata, p0=(M0, N0))
-        M_z, N_z = int(params_[0]), int(params_[1])
+        params_, _ = curve_fit(func, xdata, ydata, p0)
+        M_z, N_z = params_.astype("int")
         self.params = (M_z, N_z)
 
         # return optimum sample size M_z, N_z
@@ -641,7 +642,7 @@ class SPGC:
 
         # extract contents of "counts" text file
         SPGC = "SPGC-counts-2018-07-18"
-        zname = f"data/{SPGC}.zip"
+        zname = f"{DATAPATH}/{SPGC}.zip"
         fname = f"{SPGC}/PG{pgid}_counts.txt"
         fobj = None
         try:
@@ -654,7 +655,7 @@ class SPGC:
         # check for text file
         if fobj is None:
             try:
-                fobj = open(f"data/{fname}")
+                fobj = open(f"{DATAPATH}/{fname}")
             except Exception as e:
                 print(e)
                 raise (e)
@@ -672,7 +673,7 @@ class SPGC:
         """Retrieves metadata.csv and returns as dataframe."""
 
         # read csv
-        fname = f"data/SPGC-metadata-2018-07-18.csv"
+        fname = f"{DATAPATH}/SPGC-metadata-2018-07-18.csv"
         df = pd.read_csv(fname)
 
         # strip out "sound" entries
