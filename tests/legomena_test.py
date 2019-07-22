@@ -1,10 +1,7 @@
 # bloody dependencies
-import inspect
 from nltk.corpus import gutenberg
 import numpy as np
-import os
 import pandas as pd
-from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
 from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel
@@ -24,7 +21,8 @@ def RMSE_pct(y, y_hat):
     y_hat = np.array(y_hat)
 
     # NOTE: real NRMSE formula does / ymax-ymin but in this application ymin ~= 0
-    return np.sqrt(MSE(y, y_hat)) / y.max()
+    RMSE = np.sqrt(np.mean((y - y_hat) ** 2))
+    return RMSE / y.max()
 
 
 # unit tests

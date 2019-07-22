@@ -1,15 +1,11 @@
 # bloody dependencies
 from collections import Counter, namedtuple
-from scipy.special import comb as nCr
 import numpy as np
-import os
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
-from sklearn.linear_model import LinearRegression
+from scipy.special import comb as nCr
+from scipy.stats import linregress
 import zipfile
-
-# environment vars
-DATAPATH = os.getenv("DATAPATH", "data")
 
 
 class HeapsModel:
@@ -49,12 +45,11 @@ class HeapsModel:
         """
 
         # convert to log/log
-        log_m = np.log(m_tokens).reshape(-1, 1)
+        log_m = np.log(m_tokens)
         log_n = np.log(n_types)
-        model = LinearRegression()
-        model.fit(X=log_m, y=log_n)
-        K = np.exp(model.intercept_)
-        B = model.coef_[0]
+        slope, intercept, r_value, p_value, std_err = linregress(x=log_m, y=log_n)
+        K = np.exp(intercept)
+        B = slope
         self.params = (K, B)
         return self.params
 
@@ -646,7 +641,7 @@ class SPGC:
 
         # extract contents of "counts" text file
         SPGC = "SPGC-counts-2018-07-18"
-        zname = f"{DATAPATH}/{SPGC}.zip"
+        zname = f"data/{SPGC}.zip"
         fname = f"{SPGC}/PG{pgid}_counts.txt"
         fobj = None
         try:
@@ -659,7 +654,7 @@ class SPGC:
         # check for text file
         if fobj is None:
             try:
-                fobj = open(f"{DATAPATH}/{fname}")
+                fobj = open(f"data/{fname}")
             except Exception as e:
                 print(e)
                 raise (e)
@@ -677,7 +672,7 @@ class SPGC:
         """Retrieves metadata.csv and returns as dataframe."""
 
         # read csv
-        fname = f"{DATAPATH}/SPGC-metadata-2018-07-18.csv"
+        fname = f"data/SPGC-metadata-2018-07-18.csv"
         df = pd.read_csv(fname)
 
         # strip out "sound" entries
