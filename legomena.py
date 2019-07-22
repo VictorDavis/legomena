@@ -60,7 +60,7 @@ class HeapsModel:
 
     def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
-        Calculate & return n_types = E(m_tokens) = Km**B
+        Calculate & return n_types = E(m_tokens) = Km^B
         :param m_tokens: Number of tokens, list-like independent variable
         :returns: Number of types as predicted by Heap's Law
         """
@@ -189,6 +189,13 @@ class LogModel:
     LogParams = namedtuple("LogParams", ("M_z", "N_z"))
     _params = None
 
+    # user options
+    UserOptions = namedtuple("UserOptions", ("epsilon", "dimension"))
+    _options = UserOptions(
+        epsilon=1e-3,  # distance to singularity to return limiting value
+        dimension=6,  # max value of n returned for n-legomena count prediction
+    )
+
     @property
     def params(self) -> LogParams:
         assert (
@@ -210,28 +217,56 @@ class LogModel:
         """The number of types in this corpus's optimum sample."""
         return self.params.N_z
 
-    # apply new log formula y = f(x) for proportions y,x in [0,1]
-    def log_formula(self, x: np.ndarray, epsilon: float = 1e-3, dim: int = 6):
+    @property
+    def options(self) -> UserOptions:
+        """Misc low-impact options when evaluating the log formula."""
+        return self._options
+
+    @options.setter
+    def options(self, opt_: tuple):
+        opt_ = self.UserOptions(*opt_)
+        dim = opt_.dim
+        assert dim <= 6, "Cannot predict n-legomena counts for n > 6 at this time."
+        self._options = opt_
+
+    @property
+    def epsilon(self) -> float:
+        """Distance to singularity to return limiting value."""
+        return self.options.epsilon
+
+    @epsilon.setter
+    def epsilon(self, eps_: int):
+        eps, dim = self.options
+        eps = eps_
+        self.options = (eps, dim)
+
+    @property
+    def dimension(self) -> int:
+        """Max value of n returned for n-legomena count prediction."""
+        return self.options.dimension
+
+    @dimension.setter
+    def dimension(self, dim_: int):
+        eps, dim = self.options
+        dim = dim_
+        self.options = (eps, dim)
+
+    def log_formula(self, x: np.ndarray) -> np.ndarray:
         """
-        Applies the normalized sublinear growth x -> y formula [0,1] -> [0,1]
-        n_types = N_z * log_formula(m_tokens / M_z)
+        Predicts normalized k-vector for given proportion of tokens.
         NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
         :param x: List-like independent variable x, the proportion of tokens
-        :param epsilon: Returns limit value within +/- epsilon of singularity
-        :param dim: Desired dimension of k-vector, highest n for which to return n-legomena
-        :returns E_x: Expected proportion of types for given proportion of tokens x
-        :returns k_frac: Expected proportions of n-legomena for n = 0 to 5
+        :returns k_frac: Expected proportions of n-legomena for n = 0 to dim
         """
 
         x = np.array(x).reshape(-1)
 
         # TODO: implement generalized formula
-        MAX_DIM = 6
-        dim = MAX_DIM
+        epsilon = self.options.epsilon
+        dim = self.options.dimension
 
         # initialize return vectors
-        _E_x = np.zeros((len(x)))
-        _k_frac = np.zeros((len(x), MAX_DIM))
+        _k_frac = np.zeros((len(x), dim))
 
         # two singularities @ x=0 & x=1
         x_iszero = np.abs(x) < epsilon  # singularity @ x=0
@@ -240,10 +275,9 @@ class LogModel:
         x = x[x_isokay]
 
         # initialize results
-        k_frac = np.zeros((len(x), MAX_DIM))
+        k_frac = np.zeros((len(x), dim))
         logx = np.log(x)
-        x2, x3, x4, x5, x6 = [x ** i for i in range(2, MAX_DIM + 1)]
-        E_x = logx * x / (x - 1)
+        x2, x3, x4, x5, x6 = [x ** i for i in range(2, dim + 1)]
         k_frac[:, 0] = (x - logx * x - 1) / (x - 1)
         k_frac[:, 1] = (x2 - logx * x - x) / (x - 1) ** 2
         k_frac[:, 2] = (x3 - 2 * logx * x2 - x) / 2 / (x - 1) ** 3
@@ -260,17 +294,14 @@ class LogModel:
         )
 
         # limiting values @ x=0 & x=1
-        _E_x[x_iszero] = 0.0
         _k_frac[x_iszero, :] = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        _E_x[x_isone] = 1.0
         _k_frac[x_isone, :] = np.array(
             [0.0, 1.0 / 2, 1.0 / 6, 1.0 / 12, 1.0 / 20, 1.0 / 30]
         )
-        _E_x[x_isokay] = E_x
         _k_frac[x_isokay] = k_frac
 
         # return proportions
-        return _E_x, _k_frac
+        return _k_frac
 
     def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int) -> LogParams:
         """
@@ -321,8 +352,8 @@ class LogModel:
 
     def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
-        Applies the log formula to predict number of types as a function of tokens.
-        NOTE: predict(m) == 1 - predict_k(m)[0]
+        Calculate & return n_types = N_z * log_formula(m_tokens/M_z)
+        NOTE: predict(m) == N_z - predict_k(m)[0]
         :param m_tokens: Number of tokens, list-like independent variable
         :returns E_x: Expected proportion of types for given proportion of tokens x
         """
@@ -331,21 +362,17 @@ class LogModel:
         return_scalar = np.isscalar(m_tokens)
         m_tokens = np.array(m_tokens).reshape(-1)
 
-        # retrieve fitting parameters
-        M_z, N_z = self.params
-
-        # scale down to normalized log formula
-        x = m_tokens / M_z
-        E_x, _ = self.log_formula(x)
-        E_m = np.round(N_z * E_x)
+        # redirect: E(m) = N_z - k_0(m)
+        k = self.predict_k(m_tokens)
+        n_types = self.N_z - k[:, 0]
 
         # allow scalar
         if return_scalar:
-            assert len(E_m) == 1
-            E_m = E_m.squeeze()
+            assert len(n_types) == 1
+            n_types = float(n_types)
 
-        # return scaled up predictions
-        return E_m
+        # return number of types
+        return n_types
 
     def predict_k(self, m_tokens: np.ndarray) -> np.ndarray:
         """
@@ -363,8 +390,8 @@ class LogModel:
 
         # scale down to normalized log formula
         x = m_tokens / M_z
-        _, k = self.log_formula(x)
-        k = np.round(N_z * k)
+        k_frac = self.log_formula(x)
+        k = np.round(N_z * k_frac)
 
         # allow scalar
         if return_scalar:
@@ -612,9 +639,9 @@ class SPGC:
     # get corpus by Project Gutenberg book ID
     def get(pgid: int) -> Corpus:
         """
-        Retrieves word frequency distribution for book by PGID, reconstructs (unordered) "bag of words" from counts
+        Retrieves word frequency distribution for book by PGID
         :param pgid: Project Gutenberg book ID
-        :returns: Corpus, wrapper class for the "bag of words"
+        :returns: Corpus, wrapper class for the "bag of words" text model
         """
 
         # extract contents of "counts" text file

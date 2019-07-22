@@ -95,6 +95,7 @@ class LegomenaTest(unittest.TestCase):
         # fit TTR curve for all & compare RMSE
         results = []
         for corpus_name, corpus in corpi.items():
+            corpus.seed = 42
             m_tokens = corpus.TTR.m_tokens.values
             n_types = corpus.TTR.n_types.values
 
