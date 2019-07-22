@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error as MSE
 import unittest
 
-from ..legomena import Corpus, SPGC, HeapsModel, KTransformer
+from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel
 
 GRAPHICS_ON = False
 PGID = 2701  # moby dick
@@ -99,8 +99,9 @@ class LegomenaTest(unittest.TestCase):
             n_types = corpus.TTR.n_types.values
 
             # fit log model
-            corpus.fit()
-            predictions, _ = corpus.predict(m_tokens)
+            model = LogModel()
+            logs = model.fit(m_tokens, n_types, corpus.k[1])
+            predictions = model.predict(m_tokens)
             realizations = n_types
             rmse = RMSE_pct(realizations, predictions)
             print(f"RMSE for {corpus_name} is {rmse}.")
@@ -116,8 +117,8 @@ class LegomenaTest(unittest.TestCase):
                     corpus_name,
                     corpus.M,
                     corpus.N,
-                    corpus.M_z,
-                    corpus.N_z,
+                    logs.M_z,
+                    logs.N_z,
                     rmse,
                     heaps.K,
                     heaps.B,
@@ -156,6 +157,10 @@ class LegomenaTest(unittest.TestCase):
             "NLTK/Log   avg error:", results[results.source == "NLTK"].RMSE_pct.mean()
         )
 
+        # assert log model outperforms heaps
+        assert results.RMSE_pct.max() < 0.01
+        assert results.RMSE_pct_heaps.min() > 0.01
+
     # check SPGC failure message
     def test_spgc_fail(self):
 
@@ -177,9 +182,19 @@ class LegomenaTest(unittest.TestCase):
 
         # fit Heap's Law model to TTR curve
         model = HeapsModel()
-        K, B = model.fit(m_tokens, n_types)
-        predictions = model.predict(m_tokens)
-        # assert corpus.heaps(1000) == 789
+        params_heaps = model.fit(m_tokens, n_types)
+        predictions_heaps = model.predict(m_tokens)
+        assert model.predict(1000) == 764
+
+        # infinite series
+        predictions_iseries = corpus.iseries(df.m_tokens)
+        assert corpus.iseries(1000) == 513
+
+        # fit logarithmic model to TTR curve
+        model = LogModel()
+        params_logs = model.fit(m_tokens, n_types, corpus.k[1])
+        predictions_log = model.predict(m_tokens)
+        assert model.predict(1000) == 519
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -187,8 +202,8 @@ class LegomenaTest(unittest.TestCase):
 
             # log-log graph of Heap's Model
             plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions, color="red")
-            plt.title(f"Heap's Model (K,B) = ({K:0.4f}, {B:0.4f})")
+            plt.plot(df.m_tokens, predictions_heaps, color="red")
+            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
             plt.xscale("log")
             plt.yscale("log")
             plt.xlabel("log(tokens)")
@@ -197,17 +212,24 @@ class LegomenaTest(unittest.TestCase):
 
             # normal graph of Heap's Model
             plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions, color="red")
-            plt.title("Heap's Model (K,B) = (%f, %f)" % (K, B))
+            plt.plot(df.m_tokens, predictions_heaps, color="red")
+            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
 
             # Infinite Series Model
-            iseries_predictions = corpus.iseries(df.m_tokens)
             plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, iseries_predictions, color="red")
+            plt.plot(df.m_tokens, predictions_iseries, color="red")
             plt.title("Infinite Series Model")
+            plt.xlabel("tokens")
+            plt.ylabel("types")
+            plt.show()
+
+            # Logarithmic Model
+            plt.scatter(df.m_tokens, df.n_types)
+            plt.plot(df.m_tokens, predictions_log, color="red")
+            plt.title(f"Logarithmic Model (M_z, N_z) = (%s, %s)" % params_logs)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
@@ -281,18 +303,20 @@ class LegomenaTest(unittest.TestCase):
 
         # initialize class
         corpus = Corpus(words)  # SPGC.get(PGID)
-
-        # infer optimum sample size from observed hapax:type ratio
-        corpus.fit()
-        M_z, N_z = corpus.M_z, corpus.N_z
-
-        # measure E(x), k(x) and compare
         corpus.dimension = 5
         corpus.seed = 42
         df = corpus.TTR
 
+        # infer optimum sample size from observed hapax:type ratio
+        model = LogModel()
+        m_tokens = df.m_tokens
+        n_types = df.n_types
+        hapax = corpus.k[1]
+        M_z, N_z = model.fit_naive(corpus.M, corpus.N, hapax)
+
         # generate single prediction
-        E_m, k = corpus.predict(corpus.M)
+        E_m = model.predict(corpus.M)
+        k = model.predict_k(corpus.M)
         assert std_err(corpus.N, E_m) < 0.0001
         assert std_err(corpus.k[1], k[1]) < 0.001
         assert std_err(corpus.k[2], k[2]) < 0.005
@@ -300,8 +324,13 @@ class LegomenaTest(unittest.TestCase):
         assert std_err(corpus.k[4], k[4]) < 0.1
         assert std_err(corpus.k[5], k[5]) < 0.1
 
-        # generate vector of predictions
-        E_m, k = corpus.predict(df.m_tokens)
+        # optimized predictions: worse fit at m=M, better fit overall
+        E_m = model.predict(m_tokens)
+        RMSE_before = RMSE_pct(n_types, E_m)
+        M_z, N_z = model.fit(m_tokens, n_types, hapax)
+        E_m = model.predict(m_tokens)
+        RMSE_after = RMSE_pct(n_types, E_m)
+        assert RMSE_after < RMSE_before
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -318,11 +347,12 @@ class LegomenaTest(unittest.TestCase):
             plt.show()
 
             # predicted hapax fraction
+            k = model.predict_k(m_tokens)
             predictions = k[:, 1] / E_m
             realization = df.lego_1 / df.n_types
             plt.scatter(df.m_tokens, realization)
             plt.plot(df.m_tokens, predictions, color="red")
-            plt.title("Dis-Token Relation (Log Formula)")
+            plt.title("Hapax-Token Relation (Log Formula)")
             plt.xlabel("tokens")
             plt.ylabel("hapax fraction")
             plt.show()

@@ -182,140 +182,18 @@ class KTransformer:
         return k_
 
 
-class Corpus(Counter):
-    """Wrapper class for logarithmic competitor model to Heap's Law"""
-
-    # object properties
-    _k = None  # k-vector of n-legomena counts
-    _TTR = None  # dataframe containing type/token counts from corpus samples
+class LogModel:
+    """Types = N_z * ln(Tokens/M_z) * Tokens/M_z / (Tokens/M_z - 1)"""
 
     # params
     LogParams = namedtuple("LogParams", ("M_z", "N_z"))
     _params = None
 
-    # user options
-    UserOptions = namedtuple(
-        "UserOptions", ("resolution", "dimension", "seed", "epsilon")
-    )
-    _options = UserOptions(
-        resolution=100,  # number of samples to take when building a TTR curve
-        dimension=7,  # vector size for holding n-legomena counts (zero-based)
-        seed=None,  # random number seed for taking samples when building TTR
-        epsilon=1e-3,  # proximity to singularity to abort log formula calculation
-    )
-
-    @property
-    def tokens(self) -> list:
-        """The bag of words, list-like of elements of any type."""
-        tokens_ = list(self.elements())
-        return tokens_
-
-    @property
-    def types(self) -> list:
-        """The lexicon, ranked by frequency."""
-        fdist = self.fdist  # ranked order
-        types_ = list(fdist.type.values)
-        return types_
-
-    @property
-    def fdist(self) -> pd.DataFrame:
-        """The frequency distribution, as a dataframe."""
-        df = pd.DataFrame.from_dict(self, orient="index").reset_index()
-        df.columns = ["type", "freq"]
-        df = df.sort_values("freq", ascending=False).reset_index(drop=True)
-        return df
-
-    @property
-    def k(self) -> np.ndarray:
-        """The vector describing the frequency of n-legomena."""
-        if self._k is None:
-            self._k = Counter(self.values())
-
-        # return as array
-        k = self._k
-        kmax = max(k.keys())
-        karr = np.array([k[i] for i in range(kmax + 1)])
-        return karr
-
-    @property
-    def M(self) -> int:
-        """The number of tokens in the corpus."""
-        m_tokens = sum(self.values())
-        return m_tokens
-
-    @property
-    def N(self) -> int:
-        """The number of types in the corpus."""
-        n_types = len(self)
-        return n_types
-
-    @property
-    def options(self) -> UserOptions:
-        """Misc low-impact options when computing the TTR curve."""
-        return self._options
-
-    @options.setter
-    def options(self, opt_: tuple):
-        self._options = self.UserOptions(*opt_)
-        self._TTR = None
-        self._params = None
-
-    @property
-    def resolution(self) -> int:
-        """The desired resolution (number of samples) of the TTR curve."""
-        return self.options.resolution
-
-    @resolution.setter
-    def resolution(self, res_: int):
-        res, dim, seed, eps = self.options
-        res = res_
-        self.options = (res, dim, seed, eps)
-
-    @property
-    def dimension(self) -> int:
-        """The desired dimension of the problem, highest n for which n-legomena counts are included in TTR."""
-        return self.options.dimension
-
-    @dimension.setter
-    def dimension(self, dim_: int):
-        res, dim, seed, eps = self.options
-        dim = dim_
-        self.options = (res, dim, seed, eps)
-
-    @property
-    def seed(self) -> int:
-        """Random number seed."""
-        return self.options.seed
-
-    @seed.setter
-    def seed(self, seed_: int):
-        res, dim, seed, eps = self.options
-        seed = seed_
-        self.options = (res, dim, seed, eps)
-
-    @property
-    def epsilon(self) -> float:
-        """Distance to singularity to abort log formula calculation."""
-        return self.options.epsilon
-
-    @epsilon.setter
-    def epsilon(self, eps_: float):
-        res, dim, seed, eps = self.options
-        eps = eps_
-        self.options = (res, dim, seed, eps)
-
-    @property
-    def TTR(self) -> pd.DataFrame:
-        """DataFrame of type-token relation data."""
-        if self._TTR is None:
-            self._TTR = self._compute_TTR()
-        return self._TTR
-
     @property
     def params(self) -> LogParams:
-        """Fitting parameters M_z, N_z of the logarithmic model."""
-        if self._params is None:
-            self._params = self.fit()
+        assert (
+            self._params is not None
+        ), "Please use .fit(m_tokens, n_types) to fit the model."
         return self._params
 
     @params.setter
@@ -332,120 +210,8 @@ class Corpus(Counter):
         """The number of types in this corpus's optimum sample."""
         return self.params.N_z
 
-    def summary(self):
-        """Print some basic information about this corpus."""
-        print("Number of tokens (<corpus>.M):", self.M)
-        print("Number of types  (<corpus>.N):", self.N)
-        print("Legomena vector  (<corpus>.k):", self.k[:9])
-
-    #
-    def nlegomena(self, n: int):
-        """List of types occurring exactly n times in the corpus."""
-        nlegomena_ = [typ for typ, freq in self.items() if freq == n]
-        return nlegomena_
-
-    @property
-    def hapax(self):
-        """List of hapax (words that appear exactly once)"""
-        return self.nlegomena(1)
-
-    @property
-    def dis(self):
-        """List of dis legomena (words that appear exactly twice)"""
-        return self.nlegomena(2)
-
-    @property
-    def tris(self):
-        """List of tris legomena (words that appear exactly three times)"""
-        return self.nlegomena(3)
-
-    @property
-    def tetrakis(self):
-        """List of tetrakis legomena (words that appear exactly four times)"""
-        return self.nlegomena(4)
-
-    @property
-    def pentakis(self):
-        """List of pentakis legomena (words that appear exactly five times)"""
-        return self.nlegomena(5)
-
-    #
-    def _compute_TTR(self) -> pd.DataFrame:
-        """
-        Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
-        curve consisting of <resolution> points <(m, n)>
-        :returns: Dataframe of token/type/legomena counts
-        """
-
-        # user options
-        res, dim, seed, eps = self.options
-
-        # retrieve/reconstruct tokens
-        tokens = self.tokens
-
-        # set random seed
-        np.random.seed(seed)
-
-        # sample the corpus
-        m_choices = [int((x + 1) * self.M / res) for x in range(res)]
-        TTR = []
-        for m_tokens in m_choices:
-
-            # count types & tokens in random sample of size <m_tokens>
-            # NOTE: WITHOUT REPLACEMENT
-            subtokens = np.random.choice(tokens, m_tokens, replace=False)
-            mini_ = Corpus(subtokens)
-            n_types = mini_.N
-            row_tuple = [m_tokens, n_types]
-
-            # calculate legomena k-vector expression of tokens sample
-            if dim is not None:
-                lego_k = mini_.k
-                lego_k[0] = self.N - mini_.N
-                rank1 = len(lego_k)  # frequency of most frequent token
-                lego_k = lego_k[:dim]  # only care about n < upto
-                pad_width = dim - len(lego_k)
-                if pad_width > 0:  # i.e. len(k) < upto
-                    lego_k = np.pad(
-                        lego_k, (0, pad_width), mode="constant"
-                    )  # pad with zeros
-                row_tuple += list(lego_k) + [rank1]
-
-            # append row
-            row_tuple = tuple(row_tuple)
-            TTR.append(row_tuple)
-
-        # save to self.TTR as dataframe
-        colnames = ["m_tokens", "n_types"]
-        if dim is not None:
-            colnames += ["lego_" + str(x) for x in range(dim)]
-            colnames += ["rank1"]
-        df = pd.DataFrame(TTR, columns=colnames)
-
-        # return
-        return df
-
-    def iseries(self, m_tokens: np.ndarray) -> np.ndarray:
-        """
-        Runs infinite series model to predict N = E(M)
-        NOTE: Eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
-        :param m: List-like independent variable m, the number of tokens
-        :returns n: Array of dependent variables n, the number of types
-        """
-
-        # sum over legomena coefficients k
-        m_tokens = np.array(m_tokens).reshape(-1)
-        x = m_tokens / self.M
-        exponents = range(len(self.k))
-        terms = np.array([np.power(1 - x, n) for n in exponents])
-        k_0 = np.dot(self.k, terms)
-        E_x = np.round(self.N - k_0)
-
-        # return
-        return E_x
-
     # apply new log formula y = f(x) for proportions y,x in [0,1]
-    def log_formula(self, x: np.ndarray, epsilon: float = None, dim: int = None):
+    def log_formula(self, x: np.ndarray, epsilon: float = 1e-3, dim: int = 6):
         """
         Applies the normalized sublinear growth x -> y formula [0,1] -> [0,1]
         n_types = N_z * log_formula(m_tokens / M_z)
@@ -458,10 +224,6 @@ class Corpus(Counter):
         """
 
         x = np.array(x).reshape(-1)
-
-        # user options
-        epsilon = epsilon or self.epsilon
-        dim = dim or self.options.dimension
 
         # TODO: implement generalized formula
         MAX_DIM = 6
@@ -510,12 +272,85 @@ class Corpus(Counter):
         # return proportions
         return _E_x, _k_frac
 
-    # predicts number of n-legomena based on input (m) and free parameters (Mz,Nz)
-    def predict(self, m_tokens: np.ndarray):
+    def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int) -> LogParams:
+        """
+        Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
+        :param m_tokens: (int, scalar) Number of tokens in the corpus.
+        :param n_types: (int, scalar) Number of types in the corpus.
+        :param h_hapax: (int, scalar) Number of hapax in the corpus.
+        :returns: Logarithmic model parameters, as tuple
+        """
+
+        # infer z from h_obs
+        h_obs = h_hapax / n_types  # observed hapax proportion
+        func = lambda x: 1.0 / np.log(x) + 1.0 / (1.0 - x) - h_obs
+        z0 = 0.5
+        z = fsolve(func, z0)[0]
+        M_z = m_tokens / z
+        N_z = n_types * (z - 1) / z / np.log(z)
+        M_z, N_z = int(M_z), int(N_z)
+        self.params = (M_z, N_z)
+
+        # return optimum sample size M_z, N_z
+        return self.params
+
+    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray, h_hapax: int) -> LogParams:
+        """
+        Uses scipy.optimize.curve_fit() to fit the log model to type-token data.
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: Logarithmic model parameters, as tuple
+        """
+
+        # TODO: find initial guess without hapax
+
+        # initial guess: naive fit
+        M0, N0 = self.fit_naive(max(m_tokens), max(n_types), h_hapax)
+        # M0, N0 = max(m_tokens), max(n_types)
+
+        # minimize MSE on random perturbations of M_z, N_z
+        func = lambda m, M_z, N_z: N_z * np.log(m / M_z) * m / M_z / (m / M_z - 1)
+        xdata = np.array(m_tokens)
+        ydata = np.array(n_types)
+        params_, _ = curve_fit(func, xdata, ydata, p0=(M0, N0))
+        M_z, N_z = int(params_[0]), int(params_[1])
+        self.params = (M_z, N_z)
+
+        # return optimum sample size M_z, N_z
+        return self.params
+
+    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
         Applies the log formula to predict number of types as a function of tokens.
-        :param m_tokens: Number of tokens (scalar or list-like)
+        NOTE: predict(m) == 1 - predict_k(m)[0]
+        :param m_tokens: Number of tokens, list-like independent variable
         :returns E_x: Expected proportion of types for given proportion of tokens x
+        """
+
+        # allow scalar
+        return_scalar = np.isscalar(m_tokens)
+        m_tokens = np.array(m_tokens).reshape(-1)
+
+        # retrieve fitting parameters
+        M_z, N_z = self.params
+
+        # scale down to normalized log formula
+        x = m_tokens / M_z
+        E_x, _ = self.log_formula(x)
+        E_m = np.round(N_z * E_x)
+
+        # allow scalar
+        if return_scalar:
+            assert len(E_m) == 1
+            E_m = E_m.squeeze()
+
+        # return scaled up predictions
+        return E_m
+
+    def predict_k(self, m_tokens: np.ndarray) -> np.ndarray:
+        """
+        Applies the log formula to model the k-vector as a function of tokens.
+        :param m_tokens: Number of tokens (scalar or list-like)
         :returns k_frac: Expected proportions of n-legomena for n = 0 to 5
         """
 
@@ -528,49 +363,242 @@ class Corpus(Counter):
 
         # scale down to normalized log formula
         x = m_tokens / M_z
-        E_x, k_frac = self.log_formula(x)
-        E_m = np.round(N_z * E_x)
-        k = np.round(N_z * k_frac)
+        _, k = self.log_formula(x)
+        k = np.round(N_z * k)
 
         # allow scalar
         if return_scalar:
-            assert len(E_m) == len(k) == 1
-            E_m = E_m.squeeze()
+            assert len(k) == 1
             k = k.squeeze()
 
         # return scaled up predictions
-        return E_m, k
+        return k
 
-    # find M_z, N_z
-    def fit(self, optimize: bool = False) -> LogParams:
+
+class Corpus(Counter):
+    """Wrapper class for bag of words text model."""
+
+    # object properties
+    _k = None  # k-vector of n-legomena counts
+    _TTR = None  # dataframe containing type/token counts from corpus samples
+
+    # user options
+    UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed"))
+    _options = UserOptions(
+        resolution=100,  # number of samples to take when building a TTR curve
+        dimension=7,  # vector size for holding n-legomena counts (zero-based)
+        seed=None,  # random number seed for taking samples when building TTR
+    )
+
+    @property
+    def tokens(self) -> list:
+        """The bag of words, list-like of elements of any type."""
+        tokens_ = list(self.elements())
+        return tokens_
+
+    @property
+    def types(self) -> list:
+        """The lexicon, ranked by frequency."""
+        fdist = self.fdist  # ranked order
+        types_ = list(fdist.type.values)
+        return types_
+
+    @property
+    def fdist(self) -> pd.DataFrame:
+        """The frequency distribution, as a dataframe."""
+        df = pd.DataFrame.from_dict(self, orient="index").reset_index()
+        df.columns = ["type", "freq"]
+        df = df.sort_values("freq", ascending=False).reset_index(drop=True)
+        return df
+
+    @property
+    def WFD(self) -> pd.DataFrame:
+        """Word Frequency Distribution, as a dataframe."""
+        return self.fdist
+
+    @property
+    def k(self) -> np.ndarray:
+        """The vector describing the frequency of n-legomena."""
+        if self._k is None:
+            self._k = Counter(self.values())
+
+        # return as array
+        k = self._k
+        kmax = max(k.keys())
+        karr = np.array([k[i] for i in range(kmax + 1)])
+        return karr
+
+    @property
+    def M(self) -> int:
+        """The number of tokens in the corpus."""
+        m_tokens = sum(self.values())
+        return m_tokens
+
+    @property
+    def N(self) -> int:
+        """The number of types in the corpus."""
+        n_types = len(self)
+        return n_types
+
+    @property
+    def options(self) -> UserOptions:
+        """Misc low-impact options when computing the TTR curve."""
+        return self._options
+
+    @options.setter
+    def options(self, opt_: tuple):
+        self._options = self.UserOptions(*opt_)
+        self._TTR = None
+        self._params = None
+
+    @property
+    def resolution(self) -> int:
+        """The desired resolution (number of samples) of the TTR curve."""
+        return self.options.resolution
+
+    @resolution.setter
+    def resolution(self, res_: int):
+        res, dim, seed = self.options
+        res = res_
+        self.options = (res, dim, seed)
+
+    @property
+    def dimension(self) -> int:
+        """The desired dimension of the problem, highest n for which n-legomena counts are included in TTR."""
+        return self.options.dimension
+
+    @dimension.setter
+    def dimension(self, dim_: int):
+        res, dim, seed = self.options
+        dim = dim_
+        self.options = (res, dim, seed)
+
+    @property
+    def seed(self) -> int:
+        """Random number seed."""
+        return self.options.seed
+
+    @seed.setter
+    def seed(self, seed_: int):
+        res, dim, seed = self.options
+        seed = seed_
+        self.options = (res, dim, seed)
+
+    @property
+    def TTR(self) -> pd.DataFrame:
+        """DataFrame of type-token relation data."""
+        if self._TTR is None:
+            self._TTR = self._compute_TTR()
+        return self._TTR
+
+    def summary(self):
+        """Print some basic information about this corpus."""
+        print("Number of tokens (<corpus>.M):", self.M)
+        print("Number of types  (<corpus>.N):", self.N)
+        print("Legomena vector  (<corpus>.k):", self.k[:9])
+
+    #
+    def nlegomena(self, n: int):
+        """List of types occurring exactly n times in the corpus."""
+        nlegomena_ = [typ for typ, freq in self.items() if freq == n]
+        return nlegomena_
+
+    @property
+    def hapax(self):
+        """List of hapax (words that appear exactly once)"""
+        return self.nlegomena(1)
+
+    @property
+    def dis(self):
+        """List of dis legomena (words that appear exactly twice)"""
+        return self.nlegomena(2)
+
+    @property
+    def tris(self):
+        """List of tris legomena (words that appear exactly three times)"""
+        return self.nlegomena(3)
+
+    @property
+    def tetrakis(self):
+        """List of tetrakis legomena (words that appear exactly four times)"""
+        return self.nlegomena(4)
+
+    @property
+    def pentakis(self):
+        """List of pentakis legomena (words that appear exactly five times)"""
+        return self.nlegomena(5)
+
+    def as_datarow(self, dim: int) -> tuple:
+        """Formats corpus metadata as (M, N, k[0], k[1], ... k[dim])"""
+        as_tuple = (self.M, self.N)
+        as_tuple += tuple(self.k[:dim])
+        return as_tuple
+
+    #
+    def _compute_TTR(self) -> pd.DataFrame:
         """
-        Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
-        :param optimize: (optional) Uses scipy.optimize.curve_fit() to refine initial fit.
-        :returns: Logarithmic model parameters, as tuple
+        Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
+        curve consisting of <resolution> points <(m, n)>
+        :returns: Dataframe of token/type/legomena counts
         """
 
-        # infer z from h_obs
-        h_obs = self.k[1] / self.N  # observed hapax frac
-        func = lambda x: 1.0 / np.log(x) + 1.0 / (1.0 - x) - h_obs
-        z0 = 0.5
-        z = fsolve(func, z0)[0]
-        M_z = self.M / z
-        N_z = self.N * (z - 1) / z / np.log(z)
-        M_z, N_z = int(M_z), int(N_z)
-        self.params = (M_z, N_z)
+        # user options
+        res, dim, seed = self.options
 
-        # minimize MSE on random perturbations of M_z, N_z
-        if optimize:
-            TTR = self.TTR
-            func = lambda m, M_z, N_z: N_z * np.log(m / M_z) * m / M_z / (m / M_z - 1)
-            xdata = TTR.m_tokens
-            ydata = TTR.n_types
-            params, _ = curve_fit(func, xdata, ydata, p0=(M_z, N_z))
-            M_z, N_z = int(params[0]), int(params[1])
-            self.params = (M_z, N_z)
+        # retrieve/reconstruct tokens
+        tokens = self.tokens
 
-        # return optimum sample size M_z, N_z
-        return self.params
+        # set random seed
+        np.random.seed(seed)
+
+        # sample the corpus
+        m_choices = [int((x + 1) * self.M / res) for x in range(res)]
+        TTR = []
+        for m_tokens in m_choices:
+
+            # count types & tokens in random sample of size <m_tokens>
+            # NOTE: WITHOUT REPLACEMENT
+            subtokens = np.random.choice(tokens, m_tokens, replace=False)
+            mini_ = Corpus(subtokens)
+            TTR.append(mini_.as_datarow(dim))
+
+        # save to self.TTR as dataframe
+        colnames = ["m_tokens", "n_types"]
+        if dim is not None:
+            colnames += ["lego_" + str(x) for x in range(dim)]
+        df = pd.DataFrame(TTR, columns=colnames)
+
+        # types *not* drawn
+        df.lego_0 = self.N - df.n_types
+
+        # return
+        return df
+
+    def iseries(self, m_tokens: np.ndarray) -> np.ndarray:
+        """
+        Runs infinite series model to predict N = E(M)
+        NOTE: Eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
+        :param m: List-like independent variable m, the number of tokens
+        :returns n: Array of dependent variables n, the number of types
+        """
+
+        # allow scalar
+        return_scalar = np.isscalar(m_tokens)
+
+        # sum over legomena coefficients k
+        m_tokens = np.array(m_tokens).reshape(-1)
+        x = m_tokens / self.M
+        exponents = range(len(self.k))
+        terms = np.array([np.power(1 - x, n) for n in exponents])
+        k_0 = np.dot(self.k, terms)
+        E_m = np.round(self.N - k_0)
+
+        # allow scalar
+        if return_scalar:
+            E_m = E_m.squeeze()
+
+        # return
+        return E_m
 
 
 class SPGC:
