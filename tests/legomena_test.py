@@ -175,9 +175,9 @@ class LegomenaTest(unittest.TestCase):
 
         # build TTR curve
         corpus.seed = 42
-        df = corpus.TTR
-        m_tokens = df.m_tokens.values
-        n_types = df.n_types.values
+        TTR = corpus.TTR
+        m_tokens = TTR.m_tokens.values
+        n_types = TTR.n_types.values
 
         # fit Heap's Law model to TTR curve
         model = HeapsModel()
@@ -186,7 +186,7 @@ class LegomenaTest(unittest.TestCase):
         assert model.predict(1000) == 764
 
         # infinite series
-        predictions_iseries = corpus.iseries(df.m_tokens)
+        predictions_iseries = corpus.iseries(TTR.m_tokens)
         assert corpus.iseries(1000) == 513
 
         # fit logarithmic model to TTR curve
@@ -200,8 +200,8 @@ class LegomenaTest(unittest.TestCase):
             import matplotlib.pyplot as plt
 
             # log-log graph of Heap's Model
-            plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions_heaps, color="red")
+            plt.scatter(m_tokens, n_types)
+            plt.plot(m_tokens, predictions_heaps, color="red")
             plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
             plt.xscale("log")
             plt.yscale("log")
@@ -210,24 +210,24 @@ class LegomenaTest(unittest.TestCase):
             plt.show()
 
             # normal graph of Heap's Model
-            plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions_heaps, color="red")
+            plt.scatter(m_tokens, n_types)
+            plt.plot(m_tokens, predictions_heaps, color="red")
             plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
 
             # Infinite Series Model
-            plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions_iseries, color="red")
+            plt.scatter(m_tokens, n_types)
+            plt.plot(m_tokens, predictions_iseries, color="red")
             plt.title("Infinite Series Model")
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
 
             # Logarithmic Model
-            plt.scatter(df.m_tokens, df.n_types)
-            plt.plot(df.m_tokens, predictions_log, color="red")
+            plt.scatter(m_tokens, n_types)
+            plt.plot(m_tokens, predictions_log, color="red")
             plt.title(f"Logarithmic Model (M_z, N_z) = (%s, %s)" % params_logs)
             plt.xlabel("tokens")
             plt.ylabel("types")
@@ -260,10 +260,10 @@ class LegomenaTest(unittest.TestCase):
         # build n-legomena curves
         corpus.dimension = 5
         corpus.seed = 42
-        df = corpus.TTR
+        TTR = corpus.TTR
 
         # generate predictions
-        m_choices = df.m_tokens  # counts
+        m_choices = TTR.m_tokens  # counts
         x_choices = m_choices / corpus.M  # proportions
         k_matrix = KTransformer.transform(corpus.k, x_choices)
 
@@ -273,9 +273,9 @@ class LegomenaTest(unittest.TestCase):
 
             # predicted hapaxes
             predictions = k_matrix[:, 1]
-            realization = df.lego_1
-            plt.scatter(df.m_tokens, realization)
-            plt.plot(df.m_tokens, predictions, color="red")
+            realization = TTR.lego_1
+            plt.scatter(m_tokens, realization)
+            plt.plot(m_tokens, predictions, color="red")
             plt.title("Hapax-Token Relation")
             plt.xlabel("tokens")
             plt.ylabel("hapaxes")
@@ -283,9 +283,9 @@ class LegomenaTest(unittest.TestCase):
 
             # predicted hapaxes proportions
             predictions = k_matrix[:, 1] / (corpus.N - k_matrix[:, 0])
-            realization = df.lego_1 / df.n_types
-            plt.scatter(df.m_tokens, realization)
-            plt.plot(df.m_tokens, predictions, color="red")
+            realization = TTR.lego_1 / TTR.n_types
+            plt.scatter(m_tokens, realization)
+            plt.plot(m_tokens, predictions, color="red")
             plt.title("Hapax-Token Relation (fraction)")
             plt.xlabel("tokens")
             plt.ylabel("hapax fraction")
@@ -304,12 +304,11 @@ class LegomenaTest(unittest.TestCase):
         corpus = Corpus(words)  # SPGC.get(PGID)
         corpus.dimension = 5
         corpus.seed = 42
-        df = corpus.TTR
+        TTR = corpus.TTR
 
         # infer optimum sample size from observed hapax:type ratio
         model = LogModel()
-        m_tokens = df.m_tokens
-        n_types = df.n_types
+        m_tokens, n_types = TTR.m_tokens, TTR.n_types
         hapax = corpus.k[1]
         M_z, N_z = model.fit_naive(corpus.M, corpus.N, hapax)
 
@@ -337,9 +336,9 @@ class LegomenaTest(unittest.TestCase):
 
             # predicted hapaxes
             predictions = E_m
-            realization = df.n_types
-            plt.scatter(df.m_tokens, realization)
-            plt.plot(df.m_tokens, predictions, color="red")
+            realization = n_types
+            plt.scatter(m_tokens, realization)
+            plt.plot(m_tokens, predictions, color="red")
             plt.title("Type-Token Relation (Log Formula)")
             plt.xlabel("tokens")
             plt.ylabel("types")
@@ -348,9 +347,9 @@ class LegomenaTest(unittest.TestCase):
             # predicted hapax fraction
             k = model.predict_k(m_tokens)
             predictions = k[:, 1] / E_m
-            realization = df.lego_1 / df.n_types
-            plt.scatter(df.m_tokens, realization)
-            plt.plot(df.m_tokens, predictions, color="red")
+            realization = TTR.lego_1 / n_types
+            plt.scatter(m_tokens, realization)
+            plt.plot(m_tokens, predictions, color="red")
             plt.title("Hapax-Token Relation (Log Formula)")
             plt.xlabel("tokens")
             plt.ylabel("hapax fraction")
@@ -358,9 +357,9 @@ class LegomenaTest(unittest.TestCase):
 
             # predicted dis legomena fraction
             predictions = k[:, 2] / E_m
-            realization = df.lego_2 / df.n_types
-            plt.scatter(df.m_tokens, realization)
-            plt.plot(df.m_tokens, predictions, color="red")
+            realization = TTR.lego_2 / n_types
+            plt.scatter(m_tokens, realization)
+            plt.plot(m_tokens, predictions, color="red")
             plt.title("Dis-Token Relation (Log Formula)")
             plt.xlabel("tokens")
             plt.ylabel("dis legomena fraction")

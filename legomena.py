@@ -432,6 +432,8 @@ class Corpus(Counter):
         df = pd.DataFrame.from_dict(self, orient="index").reset_index()
         df.columns = ["type", "freq"]
         df = df.sort_values("freq", ascending=False).reset_index(drop=True)
+        df.index = df.index + 1
+        df.index.name = "rank"
         return df
 
     @property
@@ -512,7 +514,7 @@ class Corpus(Counter):
         """DataFrame of type-token relation data."""
         if self._TTR is None:
             self._TTR = self._compute_TTR()
-        return self._TTR
+        return self._TTR.copy()
 
     def summary(self):
         """Print some basic information about this corpus."""
@@ -589,13 +591,13 @@ class Corpus(Counter):
         colnames = ["m_tokens", "n_types"]
         if dim is not None:
             colnames += ["lego_" + str(x) for x in range(dim)]
-        df = pd.DataFrame(TTR, columns=colnames)
+        TTR = pd.DataFrame(TTR, columns=colnames)
 
         # types *not* drawn
-        df.lego_0 = self.N - df.n_types
+        TTR.lego_0 = self.N - TTR.n_types
 
         # return
-        return df
+        return TTR
 
     def iseries(self, m_tokens: np.ndarray) -> np.ndarray:
         """
