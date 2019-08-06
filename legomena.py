@@ -262,7 +262,7 @@ class LogModel:
         dim = dim_
         self.options = (eps, dim)
 
-    def log_formula(self, x: np.ndarray) -> np.ndarray:
+    def formula(self, x: np.ndarray) -> np.ndarray:
         """
         Predicts normalized k-vector for given proportion of tokens.
         NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
@@ -361,7 +361,7 @@ class LogModel:
 
     def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
-        Calculate & return n_types = N_z * log_formula(m_tokens/M_z)
+        Calculate & return n_types = N_z * formula(m_tokens/M_z)
         NOTE: predict(m) == N_z - predict_k(m)[0]
         :param m_tokens: Number of tokens, list-like independent variable
         :returns: Number of types as predicted by logarithmic model.
@@ -399,7 +399,7 @@ class LogModel:
 
         # scale down to normalized log formula
         x = m_tokens / M_z
-        k_frac = self.log_formula(x)
+        k_frac = self.formula(x)
         k = np.round(N_z * k_frac)
 
         # allow scalar
