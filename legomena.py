@@ -560,6 +560,21 @@ class Corpus(Counter):
         return as_tuple
 
     #
+    def sample(self, m: int = None, x: float = None):
+        """
+        Samples either <m> tokens or <x> proportion of tokens and returns smaller Corpus.
+        :param m: (int) Number of tokens to sample *without replacement*. (m <= M)
+        :param x: (float) Proportion of corpus to sample. (x <= 1)
+        :returns: Corpus composed of sampled tokens.
+        """
+
+        # sample
+        m = m or int(x * self.M)
+        tokens = np.random.choice(self.tokens, m, replace=False)
+        corpus = Corpus(tokens)
+        return corpus
+
+    #
     def _compute_TTR(self) -> pd.DataFrame:
         """
         Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
@@ -570,22 +585,12 @@ class Corpus(Counter):
         # user options
         res, dim, seed = self.options
 
-        # retrieve/reconstruct tokens
-        tokens = self.tokens
-
         # set random seed
         np.random.seed(seed)
 
         # sample the corpus
-        m_choices = [int((x + 1) * self.M / res) for x in range(res)]
-        TTR = []
-        for m_tokens in m_choices:
-
-            # count types & tokens in random sample of size <m_tokens>
-            # NOTE: WITHOUT REPLACEMENT
-            subtokens = np.random.choice(tokens, m_tokens, replace=False)
-            mini_ = Corpus(subtokens)
-            TTR.append(mini_.as_datarow(dim))
+        x_choices = (np.arange(res) + 1) / res
+        TTR = [self.sample(x=x).as_datarow(dim) for x in x_choices]
 
         # save to self.TTR as dataframe
         colnames = ["m_tokens", "n_types"]
