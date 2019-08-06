@@ -39,12 +39,12 @@ class HeapsModel:
         """Heap's Law exponent B."""
         return self.params.B
 
-    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray) -> HeapsParams:
+    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray):
         """
         Naive fit: Linear regression on logN = B*logM + expK
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
-        :returns: Heap's Law parameters, as tuple
+        :returns: (self) Fitted model
         """
 
         # convert to log/log
@@ -54,7 +54,9 @@ class HeapsModel:
         K = np.exp(intercept)
         B = slope
         self.params = (K, B)
-        return self.params
+
+        # return fitted model
+        return self
 
     def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
@@ -76,6 +78,17 @@ class HeapsModel:
 
         # return
         return n_types
+
+    def fit_predict(self, m_tokens: np.ndarray, n_types: np.ndarray) -> np.ndarray:
+        """
+        Equivalent to fit(m_tokens, n_types).predict(m_tokens)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: Number of types as predicted by Heap's Law
+        """
+
+        # fit and predict
+        return self.fit(m_tokens, n_types).predict(m_tokens)
 
 
 class KTransformer:
@@ -301,13 +314,13 @@ class LogModel:
         # return proportions
         return _k_frac
 
-    def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int) -> LogParams:
+    def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int):
         """
         Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
         :param m_tokens: (int, scalar) Number of tokens in the corpus.
         :param n_types: (int, scalar) Number of types in the corpus.
         :param h_hapax: (int, scalar) Number of hapax in the corpus.
-        :returns: Logarithmic model parameters, as tuple
+        :returns: (self) Fitted model
         """
 
         # infer z from h_obs
@@ -320,20 +333,20 @@ class LogModel:
         M_z, N_z = int(M_z), int(N_z)
         self.params = (M_z, N_z)
 
-        # return optimum sample size M_z, N_z
-        return self.params
+        # return fitted model
+        return self
 
-    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray) -> LogParams:
+    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray):
         """
         Uses scipy.optimize.curve_fit() to fit the log model to type-token data.
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
-        :returns: Logarithmic model parameters, as tuple
+        :returns: (self) Fitted model
         """
 
         # initial guess: naive fit
         M, N, H = max(m_tokens), max(n_types), max(n_types) / 2
-        p0 = self.fit_naive(M, N, H)
+        p0 = self.fit_naive(M, N, H).params
 
         # minimize MSE on random perturbations of M_z, N_z
         func = lambda m, M_z, N_z: N_z * np.log(m / M_z) * m / M_z / (m / M_z - 1)
@@ -343,15 +356,15 @@ class LogModel:
         M_z, N_z = params_.astype("int")
         self.params = (M_z, N_z)
 
-        # return optimum sample size M_z, N_z
-        return self.params
+        # return fitted model
+        return self
 
     def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
         Calculate & return n_types = N_z * log_formula(m_tokens/M_z)
         NOTE: predict(m) == N_z - predict_k(m)[0]
         :param m_tokens: Number of tokens, list-like independent variable
-        :returns E_x: Expected proportion of types for given proportion of tokens x
+        :returns: Number of types as predicted by logarithmic model.
         """
 
         # allow scalar
@@ -396,6 +409,17 @@ class LogModel:
 
         # return scaled up predictions
         return k
+
+    def fit_predict(self, m_tokens: np.ndarray, n_types: np.ndarray) -> np.ndarray:
+        """
+        Equivalent to fit(m_tokens, n_types).predict(m_tokens)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: Number of types as predicted by logarithmic model
+        """
+
+        # fit and predict
+        return self.fit(m_tokens, n_types).predict(m_tokens)
 
 
 class Corpus(Counter):

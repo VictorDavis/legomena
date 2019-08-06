@@ -96,48 +96,23 @@ class LegomenaTest(unittest.TestCase):
             corpus.seed = 42
             m_tokens = corpus.TTR.m_tokens.values
             n_types = corpus.TTR.n_types.values
-
-            # fit log model
-            model = LogModel()
-            logs = model.fit(m_tokens, n_types)
-            predictions = model.predict(m_tokens)
             realizations = n_types
+
+            # log model
+            predictions = LogModel().fit_predict(m_tokens, n_types)
             rmse = RMSE_pct(realizations, predictions)
-            print(f"RMSE for {corpus_name} is {rmse}.")
+            print(f"Log Model RMSE for {corpus_name} is {rmse}.")
 
-            # fit heaps model
-            model = HeapsModel()
-            heaps = model.fit(m_tokens, n_types)
-            predictions = model.predict(m_tokens)
+            # heaps model
+            predictions = HeapsModel().fit_predict(m_tokens, n_types)
             rmse2 = RMSE_pct(realizations, predictions)
+            print(f"Heap's Law RMSE for {corpus_name} is {rmse2}.")
 
-            results.append(
-                (
-                    corpus_name,
-                    corpus.M,
-                    corpus.N,
-                    logs.M_z,
-                    logs.N_z,
-                    rmse,
-                    heaps.K,
-                    heaps.B,
-                    rmse2,
-                )
-            )
+            results.append((corpus_name, rmse, rmse2))
 
         # aggregate & analyze results
         results = pd.DataFrame(results)
-        results.columns = [
-            "name",
-            "M",
-            "N",
-            "M_z",
-            "N_z",
-            "RMSE_pct",
-            "K",
-            "B",
-            "RMSE_pct_heaps",
-        ]
+        results.columns = ["name", "RMSE_pct", "RMSE_pct_heaps"]
         results["source"] = [name[-4:] for name in results.name]
 
         print(results)
@@ -180,20 +155,18 @@ class LegomenaTest(unittest.TestCase):
         n_types = TTR.n_types.values
 
         # fit Heap's Law model to TTR curve
-        model = HeapsModel()
-        params_heaps = model.fit(m_tokens, n_types)
-        predictions_heaps = model.predict(m_tokens)
-        assert model.predict(1000) == 764
+        hmodel = HeapsModel().fit(m_tokens, n_types)
+        predictions_heaps = hmodel.predict(m_tokens)
+        assert hmodel.predict(1000) == 764
 
         # infinite series
         predictions_iseries = corpus.iseries(TTR.m_tokens)
         assert corpus.iseries(1000) == 513
 
         # fit logarithmic model to TTR curve
-        model = LogModel()
-        params_logs = model.fit(m_tokens, n_types)
-        predictions_log = model.predict(m_tokens)
-        assert model.predict(1000) == 519
+        lmodel = LogModel().fit(m_tokens, n_types)
+        predictions_log = lmodel.predict(m_tokens)
+        assert lmodel.predict(1000) == 519
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -202,7 +175,7 @@ class LegomenaTest(unittest.TestCase):
             # log-log graph of Heap's Model
             plt.scatter(m_tokens, n_types)
             plt.plot(m_tokens, predictions_heaps, color="red")
-            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
+            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % hmodel.params)
             plt.xscale("log")
             plt.yscale("log")
             plt.xlabel("log(tokens)")
@@ -212,7 +185,7 @@ class LegomenaTest(unittest.TestCase):
             # normal graph of Heap's Model
             plt.scatter(m_tokens, n_types)
             plt.plot(m_tokens, predictions_heaps, color="red")
-            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % params_heaps)
+            plt.title("Heap's Model (K,B) = (%0.4f, %0.4f)" % hmodel.params)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
@@ -228,7 +201,7 @@ class LegomenaTest(unittest.TestCase):
             # Logarithmic Model
             plt.scatter(m_tokens, n_types)
             plt.plot(m_tokens, predictions_log, color="red")
-            plt.title(f"Logarithmic Model (M_z, N_z) = (%s, %s)" % params_logs)
+            plt.title(f"Logarithmic Model (M_z, N_z) = (%s, %s)" % lmodel.params)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
@@ -307,10 +280,9 @@ class LegomenaTest(unittest.TestCase):
         TTR = corpus.TTR
 
         # infer optimum sample size from observed hapax:type ratio
-        model = LogModel()
-        m_tokens, n_types = TTR.m_tokens, TTR.n_types
         hapax = corpus.k[1]
-        M_z, N_z = model.fit_naive(corpus.M, corpus.N, hapax)
+        model = LogModel().fit_naive(corpus.M, corpus.N, hapax)
+        m_tokens, n_types = TTR.m_tokens, TTR.n_types
 
         # generate single prediction
         E_m = model.predict(corpus.M)
@@ -325,8 +297,7 @@ class LegomenaTest(unittest.TestCase):
         # optimized predictions: worse fit at m=M, better fit overall
         E_m = model.predict(m_tokens)
         RMSE_before = RMSE_pct(n_types, E_m)
-        M_z, N_z = model.fit(m_tokens, n_types)
-        E_m = model.predict(m_tokens)
+        E_m = model.fit_predict(m_tokens, n_types)
         RMSE_after = RMSE_pct(n_types, E_m)
         assert RMSE_after < RMSE_before
 
