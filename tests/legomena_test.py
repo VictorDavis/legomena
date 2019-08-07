@@ -49,12 +49,31 @@ class LegomenaTest(unittest.TestCase):
         assert sum(corpus.k) == corpus.N
         assert len(corpus.types) == corpus.N
 
+    def test_spgc_basic(self):
+
+        # get()
+        corpus = SPGC.get(2701)
+        corpus2 = SPGC.get("PG2701")
+        assert corpus2 == corpus
+        assert corpus.M == 210258
+        assert corpus.N == 16402
+        with self.assertRaises(Exception) as context:
+            corpus = SPGC.get(999999)
+
+        # metadata()
+        df = SPGC.metadata()
+        assert df.shape == (56466, 8)
+        df = SPGC.metadata(language="en")
+        assert df.shape == (45790, 8)
+        df = SPGC.metadata(language="xx")
+        assert df.shape == (0, 8)
+
     # ETL & sample SPGC data to generate legomena counts
     def test_spgc(self):
 
         # retrieve Moby Dick from SPGC
         corpus = SPGC.get(PGID)
-        meta = SPGC.getMeta()
+        meta = SPGC.metadata()
 
         # NLTK-SPGC lookup
         books = pd.DataFrame(
@@ -134,13 +153,6 @@ class LegomenaTest(unittest.TestCase):
         # assert log model outperforms heaps
         assert results.RMSE_pct.max() < 0.01
         assert results.RMSE_pct_heaps.min() > 0.01
-
-    # check SPGC failure message
-    def test_spgc_fail(self):
-
-        # retrieve non-book id from SPGC
-        with self.assertRaises(Exception) as context:
-            corpus = SPGC.get(999999)
 
     # model-fitting tests
     def test_models(self):

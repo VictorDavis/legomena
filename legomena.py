@@ -667,14 +667,19 @@ class SPGC:
     def get(pgid: int) -> Corpus:
         """
         Retrieves word frequency distribution for book by PGID
-        :param pgid: Project Gutenberg book ID
+        :param pgid: (int or str) Project Gutenberg book ID, ex get(2701) or get("PG2701")
         :returns: Corpus, wrapper class for the "bag of words" text model
         """
+
+        # convert int -> str
+        pgid = str(pgid)
+        if pgid[:2] != "PG":
+            pgid = f"PG{pgid}"
 
         # extract contents of "counts" text file
         SPGC = "SPGC-counts-2018-07-18"
         zname = f"{DATAPATH}/{SPGC}.zip"
-        fname = f"{SPGC}/PG{pgid}_counts.txt"
+        fname = f"{SPGC}/{pgid}_counts.txt"
         fobj = None
         try:
             z = zipfile.ZipFile(zname)
@@ -700,20 +705,24 @@ class SPGC:
         return corpus
 
     # get SPGC metadata from csv
-    def getMeta():
-        """Retrieves metadata.csv and returns as dataframe."""
+    def metadata(language: str = None) -> pd.DataFrame:
+        """
+        Retrieves metadata.csv and returns as dataframe.
+        :param language: (optional) 2-letter language code, 'en', 'fr', etc
+        """
 
         # read csv
         fname = f"{DATAPATH}/SPGC-metadata-2018-07-18.csv"
-        df = pd.read_csv(fname)
+        df = pd.read_csv(fname).set_index("id")
 
         # strip out "sound" entries
-        df = df[df.type == "Text"]
-        assert df.shape == (56466, 9), f"ERROR: Corrupted SPGC file {fname}."
+        df = df.query('type == "Text"')
+        assert df.shape == (56466, 8), f"ERROR: Corrupted SPGC file {fname}."
 
-        # key records by numeric PG ID
-        df.id = df.id.str.replace("PG", "")
-        df = df.set_index("id")
+        # filter language
+        if language is not None:
+            language = f"['{language}']"
+            df = df.query("language == @language")
 
         # return
         return df
