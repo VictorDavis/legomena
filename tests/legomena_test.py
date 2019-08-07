@@ -39,15 +39,29 @@ class LegomenaTest(unittest.TestCase):
         corpus = Corpus(words)
 
         # sanity checks
+        assert set(corpus.tokens) == set(words)
         assert corpus.M == len(words)
         assert corpus.N == len(set(words))
         assert corpus.fdist.freq.sum() == corpus.M
         assert corpus.fdist.shape[0] == corpus.N
-        hapaxes = corpus.hapax
         assert corpus.k[0] == 0
-        assert corpus.k[1] == len(hapaxes)
+        assert corpus.k[1] == len(corpus.hapax)
+        assert corpus.k[2] == len(corpus.dis)
+        assert corpus.k[3] == len(corpus.tris)
+        assert corpus.k[4] == len(corpus.tetrakis)
+        assert corpus.k[5] == len(corpus.pentakis)
+        assert corpus.k[42] == len(corpus.nlegomena(42))
         assert sum(corpus.k) == corpus.N
         assert len(corpus.types) == corpus.N
+        assert corpus.WFD.equals(corpus.fdist)
+        assert corpus.as_datarow(7) == (8354, 1820, 0, 1009, 293, 138, 72, 57, 41)
+
+        # sample()
+        assert corpus.sample(99).M == 99
+        assert corpus.sample(x=0).M == 0
+        assert corpus.sample(x=1).M == corpus.M
+        with self.assertRaises(Exception) as context:
+            corpus.sample(x=1.5)  # can't over sample with replace=False
 
     def test_spgc_basic(self):
 
