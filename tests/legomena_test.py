@@ -103,9 +103,7 @@ class LegomenaTest(unittest.TestCase):
         # build corpi from each source
         corpi = {}
         for book in books.itertuples():
-            print(f"\nLoading SPGC {book.SPGC_id}")
             corpi[f"{book.SPGC_id}_SPGC"] = SPGC.get(book.SPGC_id)
-            print(f"\nLoading NLTK {book.NLTK_id}")
             words = list(gutenberg.words(book.NLTK_id))
             corpi[f"{book.NLTK_id}_NLTK"] = Corpus(words)
 
@@ -120,12 +118,10 @@ class LegomenaTest(unittest.TestCase):
             # log model
             predictions = LogModel().fit_predict(m_tokens, n_types)
             rmse = RMSE_pct(realizations, predictions)
-            print(f"Log Model RMSE for {corpus_name} is {rmse}.")
 
             # heaps model
             predictions = HeapsModel().fit_predict(m_tokens, n_types)
             rmse2 = RMSE_pct(realizations, predictions)
-            print(f"Heap's Law RMSE for {corpus_name} is {rmse2}.")
 
             results.append((corpus_name, rmse, rmse2))
 
@@ -133,22 +129,6 @@ class LegomenaTest(unittest.TestCase):
         results = pd.DataFrame(results)
         results.columns = ["name", "RMSE_pct", "RMSE_pct_heaps"]
         results["source"] = [name[-4:] for name in results.name]
-
-        print(results)
-        print(
-            "SPGC/Heaps avg error:",
-            results[results.source == "SPGC"].RMSE_pct_heaps.mean(),
-        )
-        print(
-            "NLTK/Heaps avg error:",
-            results[results.source == "NLTK"].RMSE_pct_heaps.mean(),
-        )
-        print(
-            "SPGC/Log   avg error:", results[results.source == "SPGC"].RMSE_pct.mean()
-        )
-        print(
-            "NLTK/Log   avg error:", results[results.source == "NLTK"].RMSE_pct.mean()
-        )
 
         # assert log model outperforms heaps
         assert results.RMSE_pct.max() < 0.01
@@ -230,7 +210,7 @@ class LegomenaTest(unittest.TestCase):
         A_1 = np.identity(D)
         assert np.array_equal(KTransformer.A_x(0.0, D), A_0)
         assert np.array_equal(KTransformer.A_x(1.0, D), A_1)
-        print("A(0.5) = \n", KTransformer.A_x(0.5, D))
+        A_half = KTransformer.A_x(0.5, D)
 
         # transform k to k'
         # NOTE: computationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
