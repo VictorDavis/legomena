@@ -628,12 +628,26 @@ class Corpus(Counter):
         # return
         return TTR
 
-    def iseries(self, m_tokens: np.ndarray) -> np.ndarray:
+
+class InfSeriesModel:
+    """
+    Runs infinite series model to predict N = E(M)
+    NOTE: Eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
+    """
+
+    def __init__(self, corpus: Corpus):
+        """No fit() function, instantiate model as an extension of corpus."""
+
+        # the legomena counts parametrize this model
+        self.M = corpus.M
+        self.N = corpus.N
+        self.k = corpus.k
+
+    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
         """
-        Runs infinite series model to predict N = E(M)
-        NOTE: Eqn (8b) in https://arxiv.org/pdf/1901.00521.pdf
-        :param m: List-like independent variable m, the number of tokens
-        :returns n: Array of dependent variables n, the number of types
+        Calculate & return n_types = E(m_tokens) = Km^B
+        :param m_tokens: Number of tokens, list-like independent variable
+        :returns: Number of types as predicted by Heap's Law
         """
 
         # allow scalar
@@ -645,14 +659,14 @@ class Corpus(Counter):
         exponents = range(len(self.k))
         terms = np.array([np.power(1 - x, n) for n in exponents])
         k_0 = np.dot(self.k, terms)
-        E_m = np.round(self.N - k_0)
+        n_types = np.round(self.N - k_0)
 
         # allow scalar
         if return_scalar:
-            E_m = E_m.squeeze()
+            n_types = n_types.squeeze()
 
         # return
-        return E_m
+        return n_types
 
 
 class SPGC:

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import unittest
 
-from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel
+from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeriesModel
 
 GRAPHICS_ON = False
 PGID = 2701  # moby dick
@@ -166,8 +166,9 @@ class LegomenaTest(unittest.TestCase):
         assert hmodel.predict(1000) == 764
 
         # infinite series
-        predictions_iseries = corpus.iseries(TTR.m_tokens)
-        assert corpus.iseries(1000) == 513
+        imodel = InfSeriesModel(corpus)
+        predictions_iseries = imodel.predict(m_tokens)
+        assert imodel.predict(1000) == 513
 
         # fit logarithmic model to TTR curve
         lmodel = LogModel().fit(m_tokens, n_types)
@@ -253,8 +254,8 @@ class LegomenaTest(unittest.TestCase):
             # predicted hapaxes
             predictions = k_matrix[:, 1]
             realization = TTR.lego_1
-            plt.scatter(m_tokens, realization)
-            plt.plot(m_tokens, predictions, color="red")
+            plt.scatter(TTR.m_tokens, realization)
+            plt.plot(TTR.m_tokens, predictions, color="red")
             plt.title("Hapax-Token Relation")
             plt.xlabel("tokens")
             plt.ylabel("hapaxes")
@@ -263,8 +264,8 @@ class LegomenaTest(unittest.TestCase):
             # predicted hapaxes proportions
             predictions = k_matrix[:, 1] / (corpus.N - k_matrix[:, 0])
             realization = TTR.lego_1 / TTR.n_types
-            plt.scatter(m_tokens, realization)
-            plt.plot(m_tokens, predictions, color="red")
+            plt.scatter(TTR.m_tokens, realization)
+            plt.plot(TTR.m_tokens, predictions, color="red")
             plt.title("Hapax-Token Relation (fraction)")
             plt.xlabel("tokens")
             plt.ylabel("hapax fraction")
