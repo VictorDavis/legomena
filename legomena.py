@@ -58,10 +58,11 @@ class HeapsModel:
         # return fitted model
         return self
 
-    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
+    def predict(self, m_tokens: np.ndarray, nearest_int: bool = True) -> np.ndarray:
         """
         Calculate & return n_types = E(m_tokens) = Km^B
         :param m_tokens: Number of tokens, list-like independent variable
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
         :returns: Number of types as predicted by Heap's Law
         """
 
@@ -70,7 +71,9 @@ class HeapsModel:
 
         # run model
         K, B = self.params
-        n_types = np.round(K * np.power(m_tokens, B))
+        n_types = K * np.power(m_tokens, B)
+        if nearest_int:
+            n_types = np.round(n_types)
 
         # allow scalar
         if return_scalar:
@@ -359,11 +362,12 @@ class LogModel:
         # return fitted model
         return self
 
-    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
+    def predict(self, m_tokens: np.ndarray, nearest_int: bool = True) -> np.ndarray:
         """
         Calculate & return n_types = N_z * formula(m_tokens/M_z)
         NOTE: predict(m) == N_z - predict_k(m)[0]
         :param m_tokens: Number of tokens, list-like independent variable
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
         :returns: Number of types as predicted by logarithmic model.
         """
 
@@ -372,7 +376,7 @@ class LogModel:
         m_tokens = np.array(m_tokens).reshape(-1)
 
         # redirect: E(m) = N_z - k_0(m)
-        k = self.predict_k(m_tokens)
+        k = self.predict_k(m_tokens, nearest_int=nearest_int)
         n_types = self.N_z - k[:, 0]
 
         # allow scalar
@@ -383,11 +387,15 @@ class LogModel:
         # return number of types
         return n_types
 
-    def predict_k(self, m_tokens: np.ndarray) -> np.ndarray:
+    def predict_k(
+        self, m_tokens: np.ndarray, normalize: bool = False, nearest_int: bool = True
+    ) -> np.ndarray:
         """
         Applies the log formula to model the k-vector as a function of tokens.
         :param m_tokens: Number of tokens (scalar or list-like)
-        :returns k_frac: Expected proportions of n-legomena for n = 0 to 5
+        :param normalize: (bool, False) Return proportions instead of counts
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
+        :returns k: Predicted n-legomena counts for n = 0 to 5
         """
 
         # allow scalar
@@ -400,14 +408,26 @@ class LogModel:
         # scale down to normalized log formula
         x = m_tokens / M_z
         k_frac = self.formula(x)
-        k = np.round(N_z * k_frac)
+
+        # normalize, or don't
+        if normalize:
+            # predicted counts as a proportion of predicted types
+            y_types_omitted = k_frac[:, 0]
+            y_types_selected = 1 - y_types_omitted
+            y_types_selected = y_types_selected[:, np.newaxis]
+            k = k_frac / y_types_selected
+        else:
+            # predicted counts
+            k = N_z * k_frac
+            if nearest_int:
+                k = np.round(k)
 
         # allow scalar
         if return_scalar:
             assert len(k) == 1
             k = k.squeeze()
 
-        # return scaled up predictions
+        # return n-legomena counts
         return k
 
     def fit_predict(self, m_tokens: np.ndarray, n_types: np.ndarray) -> np.ndarray:
@@ -643,10 +663,11 @@ class InfSeriesModel:
         self.N = corpus.N
         self.k = corpus.k
 
-    def predict(self, m_tokens: np.ndarray) -> np.ndarray:
+    def predict(self, m_tokens: np.ndarray, nearest_int: bool = True) -> np.ndarray:
         """
         Calculate & return n_types = E(m_tokens) = Km^B
         :param m_tokens: Number of tokens, list-like independent variable
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
         :returns: Number of types as predicted by Heap's Law
         """
 
@@ -659,7 +680,9 @@ class InfSeriesModel:
         exponents = range(len(self.k))
         terms = np.array([np.power(1 - x, n) for n in exponents])
         k_0 = np.dot(self.k, terms)
-        n_types = np.round(self.N - k_0)
+        n_types = self.N - k_0
+        if nearest_int:
+            n_types = np.round(n_types)
 
         # allow scalar
         if return_scalar:
@@ -711,8 +734,8 @@ class SPGC:
                 raise (e)
 
         # build corpus from frequency distribution
-        df = pd.read_csv(fobj, header=-1, delimiter="\t")
-        asdict = {row[1]: row[2] for row in df.itertuples()}
+        df = pd.read_csv(fobj, delimiter="\t", header=None, names=["word", "freq"])
+        asdict = {row.word: row.freq for row in df.itertuples()}
         corpus = Corpus(asdict)
 
         # return corpus object
@@ -728,10 +751,11 @@ class SPGC:
         # read csv
         fname = f"{DATAPATH}/SPGC-metadata-2018-07-18.csv"
         df = pd.read_csv(fname).set_index("id")
+        df = df[~df.title.isna()]
 
         # strip out "sound" entries
         df = df.query('type == "Text"')
-        assert df.shape == (56466, 8), f"ERROR: Corrupted SPGC file {fname}."
+        assert df.shape == (56395, 8), f"ERROR: Corrupted SPGC file {fname}."
 
         # filter language
         if language is not None:
