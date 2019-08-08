@@ -3,8 +3,9 @@ dash-core-components==0.47.0
 dash-html-components==0.16.0
 Flask==1.1.1
 Flask-Compress==1.4.0
+gunicorn==19.9.0
 nltk==3.4
 numpy==1.17.0
 pandas==0.25.0
 plotly==4.0.0
-gunicorn==19.9.0
+scipy==1.3.0
