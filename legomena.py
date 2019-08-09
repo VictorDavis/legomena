@@ -615,7 +615,7 @@ class Corpus(Counter):
 
         # sample
         m = m or int(x * self.M)
-        random_state = np.random.RandomState(self.seed)
+        random_state = np.random.RandomState(self.seed + m)
         tokens = random_state.choice(self.tokens, m, replace=False)
         corpus = Corpus(tokens)
         return corpus
