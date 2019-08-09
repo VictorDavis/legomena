@@ -2,6 +2,7 @@
 from nltk.corpus import gutenberg
 import numpy as np
 import pandas as pd
+from scipy.stats import linregress
 import unittest
 
 # classes to test
@@ -10,6 +11,7 @@ from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeri
 # globals
 GRAPHICS_ON = False
 PGID = 2701  # moby dick
+SEED = 42
 
 # standard error
 def std_err(y: float, y_hat: float):
@@ -126,7 +128,7 @@ class LegomenaTest(unittest.TestCase):
         # fit TTR curve for all & compare RMSE
         results = []
         for corpus_id, (source, title, corpus) in corpi.items():
-            corpus.seed = 42
+            corpus.seed = SEED
             TTR = corpus.TTR
             m_tokens = TTR.m_tokens.values
             n_types = TTR.n_types.values
@@ -191,7 +193,7 @@ class LegomenaTest(unittest.TestCase):
         corpus = SPGC.get(PGID)
 
         # build TTR curve
-        corpus.seed = 42
+        corpus.seed = SEED
         TTR = corpus.TTR
         m_tokens = TTR.m_tokens.values
         n_types = TTR.n_types.values
@@ -275,7 +277,7 @@ class LegomenaTest(unittest.TestCase):
 
         # build n-legomena curves
         corpus.dimension = 5
-        corpus.seed = 42
+        corpus.seed = SEED
         TTR = corpus.TTR
 
         # generate predictions
@@ -319,7 +321,7 @@ class LegomenaTest(unittest.TestCase):
         # initialize class
         corpus = Corpus(words)  # SPGC.get(PGID)
         corpus.dimension = 5
-        corpus.seed = 42
+        corpus.seed = SEED
         TTR = corpus.TTR
 
         # infer optimum sample size from observed hapax:type ratio
@@ -388,10 +390,10 @@ class LegomenaTest(unittest.TestCase):
 
         # sampling process works
         corpus = Corpus(words)
-        corpus.seed = 42
+        corpus.seed = SEED
         before = corpus.TTR.n_types
         corpus = Corpus(words)
-        corpus.seed = 42
+        corpus.seed = SEED
         after = corpus.TTR.n_types
         pd.testing.assert_series_equal(before, after)
 
@@ -403,3 +405,14 @@ class LegomenaTest(unittest.TestCase):
         model.fit(TTR.m_tokens, TTR.n_types)
         after = model.params
         assert before == after
+
+    # optimum sample size linear scaling
+    def test_optimum_slope(self):
+
+        # load cached model-fitting data
+        df = pd.read_csv("data/books.csv", index_col=0)
+
+        # run a linear regression on N_z = f(M_z)
+        slope, intercept, r_value, p_value, std_err = linregress(x=df.M_z, y=df.N_z)
+        assert r_value > 0.95
+        assert std_err < 0.005

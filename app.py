@@ -6,12 +6,16 @@ import dash_html_components as html
 from nltk.corpus import gutenberg
 import pandas as pd
 import plotly.graph_objects as go
+from scipy.stats import linregress
 
 # internal dependencies
 from legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
 
 # model comparison over all books, created by test_spgc_nltk()
 books = pd.read_csv("data/books.csv", index_col=0)
+
+# use random seed to ensure cross-figure consistency
+SEED = 42
 
 # available sources
 def sources():
@@ -78,7 +82,7 @@ def plotTTR(source, fileid):
         corpus = SPGC.get(fileid)
 
     # type-token ratio data
-    corpus.seed = 42
+    corpus.seed = SEED
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens
     n_types = TTR.n_types
@@ -139,8 +143,8 @@ def plotTTR(source, fileid):
     )
     layout = go.Layout(
         title="Type-Token Ratio & N-Legomena Counts",
-        xaxis=dict(title="Tokens"),
-        yaxis=dict(title="Types"),
+        xaxis=dict(title="Corpus Size (Tokens)"),
+        yaxis=dict(title="Vocabulary Size (Types)"),
     )
     fig = {"data": data, "layout": layout}
     return fig
@@ -161,7 +165,7 @@ def plotLego(source, fileid):
         corpus = SPGC.get(fileid)
 
     # type-token ratio data
-    corpus.seed = 42
+    corpus.seed = SEED
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens
     n_types = TTR.n_types
@@ -210,7 +214,7 @@ def plotLego(source, fileid):
     )
     layout = go.Layout(
         title="Type & Legomena Proportions",
-        xaxis=dict(title="Tokens"),
+        xaxis=dict(title="Corpus Size (Tokens)"),
         yaxis=dict(title="Proportion of Types", tickformat=",.0%"),
     )
     fig = {"data": data, "layout": layout}
@@ -219,15 +223,24 @@ def plotLego(source, fileid):
 
 @app.callback(Output("figData", "figure"), [Input("source-selector", "value")])
 def plotData(source):
+
+    # filter to source
     df = books.query("source == @source")
+
+    # linear regression N_z = f(M_z)
+    slope, intercept, rvalue, _, _ = linregress(x=df.M_z, y=df.N_z)
+    df["N_z_pred"] = intercept + slope * df.M_z
+
+    # build figure
     data = [
         go.Scatter(
             x=df.m_tokens, y=df.n_types, name="Actual", text=df.title, mode="markers"
         ),
         go.Scatter(x=df.M_z, y=df.N_z, name="Optimum", text=df.title, mode="markers"),
+        go.Scatter(x=df.M_z, y=df.N_z_pred, mode="lines", name="Best Fit"),
     ]
     layout = go.Layout(
-        title="Actual vs Optimum Type/Token Values",
+        title=f"Actual vs Optimum Type/Token Counts (Best Fit slope={slope:0.4f}, r={rvalue:0.4})",
         xaxis=dict(title="Corpus Size (Tokens)"),
         yaxis=dict(title="Vocabulary Size (Types)"),
         hovermode="closest",
