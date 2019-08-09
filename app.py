@@ -78,9 +78,10 @@ def plotTTR(source, fileid):
         corpus = SPGC.get(fileid)
 
     # type-token ratio data
+    corpus.seed = 42
     TTR = corpus.TTR
-    m_tokens = TTR.m_tokens.values
-    n_types = TTR.n_types.values
+    m_tokens = TTR.m_tokens
+    n_types = TTR.n_types
 
     # fit Heap's Law model to TTR curve
     hmodel = HeapsModel().fit(m_tokens, n_types)
@@ -160,13 +161,14 @@ def plotLego(source, fileid):
         corpus = SPGC.get(fileid)
 
     # type-token ratio data
+    corpus.seed = 42
     TTR = corpus.TTR
-    m_tokens = TTR.m_tokens.values
-    n_types = TTR.n_types.values
+    m_tokens = TTR.m_tokens
+    n_types = TTR.n_types
 
     # fit logarithmic model to TTR curve
     lmodel = LogModel().fit(m_tokens, n_types)
-    k_pred = lmodel.predict_k(TTR.m_tokens, normalize=True)
+    k_pred = lmodel.predict_k(m_tokens, normalize=True)
     dim = k_pred.shape[1]
     for n in range(dim):
         TTR[f"lego_{n}"] = TTR[f"lego_{n}"] / TTR.n_types

@@ -35,7 +35,7 @@ class LegomenaTest(unittest.TestCase):
 
         # retrieve corpus from NLTK
         filename = "blake-poems.txt"
-        words = list(gutenberg.words(filename))
+        words = gutenberg.words(filename)
 
         # initialize class
         corpus = Corpus(words)
@@ -127,8 +127,9 @@ class LegomenaTest(unittest.TestCase):
         results = []
         for corpus_id, (source, title, corpus) in corpi.items():
             corpus.seed = 42
-            m_tokens = corpus.TTR.m_tokens.values
-            n_types = corpus.TTR.n_types.values
+            TTR = corpus.TTR
+            m_tokens = TTR.m_tokens.values
+            n_types = TTR.n_types.values
 
             # log model
             model = LogModel()
@@ -181,7 +182,7 @@ class LegomenaTest(unittest.TestCase):
 
         # assert log model outperforms heaps
         assert results.RMSE_log.max() < 0.01
-        assert results.RMSE_heaps.min() > 0.01
+        assert results.RMSE_heaps.min() > 0.008
 
     # model-fitting tests
     def test_models(self):
@@ -311,7 +312,7 @@ class LegomenaTest(unittest.TestCase):
 
         # retrieve corpus from NLTK
         filename = "melville-moby_dick.txt"
-        words = list(gutenberg.words(filename))
+        words = gutenberg.words(filename)
 
         # TODO: Why SPGC model quality suffers relative to NLTK ?
 
@@ -377,3 +378,28 @@ class LegomenaTest(unittest.TestCase):
             plt.xlabel("tokens")
             plt.ylabel("dis legomena fraction")
             plt.show()
+
+    # enforce random seed behavior
+    def test_random_seed(self):
+
+        # retrieve corpus from NLTK
+        filename = "blake-poems.txt"
+        words = gutenberg.words(filename)
+
+        # sampling process works
+        corpus = Corpus(words)
+        corpus.seed = 42
+        before = corpus.TTR.n_types
+        corpus = Corpus(words)
+        corpus.seed = 42
+        after = corpus.TTR.n_types
+        pd.testing.assert_series_equal(before, after)
+
+        # model fitting works
+        TTR = corpus.TTR
+        model = LogModel()
+        model.fit(TTR.m_tokens, TTR.n_types)
+        before = model.params
+        model.fit(TTR.m_tokens, TTR.n_types)
+        after = model.params
+        assert before == after
