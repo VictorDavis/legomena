@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 import unittest
 
+# classes to test
 from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeriesModel
 
+# globals
 GRAPHICS_ON = False
 PGID = 2701  # moby dick
 
@@ -82,71 +84,104 @@ class LegomenaTest(unittest.TestCase):
         df = SPGC.metadata(language="xx")
         assert df.shape == (0, 8)
 
-    # ETL & sample SPGC data to generate legomena counts
-    def test_spgc(self):
-
-        # retrieve Moby Dick from SPGC
-        corpus = SPGC.get(PGID)
-        meta = SPGC.metadata()
+    # compare models on SPGC and NLTK data
+    def test_spgc_nltk(self):
 
         # NLTK-SPGC lookup
         books = pd.DataFrame(
             [
-                ("austen-emma.txt", 158),
-                ("austen-persuasion.txt", 105),
-                ("austen-sense.txt", 161),
-                ("bible-kjv.txt", 10),
-                ("blake-poems.txt", 574),
-                ("bryant-stories.txt", 473),
-                ("burgess-busterbrown.txt", 22816),
-                # ("carroll-alice.txt", 11),
-                ("chesterton-ball.txt", 5265),
-                ("chesterton-brown.txt", 223),
-                ("chesterton-thursday.txt", 1695),
-                ("edgeworth-parents.txt", 3655),
-                ("melville-moby_dick.txt", 2701),
-                ("milton-paradise.txt", 26),
-                ("shakespeare-caesar.txt", 1120),
-                ("shakespeare-hamlet.txt", 1122),
-                ("shakespeare-macbeth.txt", 1129),
-                ("whitman-leaves.txt", 1322),
-            ]
+                ("austen-emma.txt", "PG158"),
+                ("austen-persuasion.txt", "PG105"),
+                ("austen-sense.txt", "PG161"),
+                ("bible-kjv.txt", "PG10"),
+                ("blake-poems.txt", "PG574"),
+                ("bryant-stories.txt", "PG473"),
+                ("burgess-busterbrown.txt", "PG22816"),
+                # ("carroll-alice.txt", "PG11"),  # SPGC missing PG11_counts.txt :(
+                ("chesterton-ball.txt", "PG5265"),
+                ("chesterton-brown.txt", "PG223"),
+                ("chesterton-thursday.txt", "PG1695"),
+                ("edgeworth-parents.txt", "PG3655"),
+                ("melville-moby_dick.txt", "PG2701"),
+                ("milton-paradise.txt", "PG26"),
+                ("shakespeare-caesar.txt", "PG1120"),
+                ("shakespeare-hamlet.txt", "PG1122"),
+                ("shakespeare-macbeth.txt", "PG1129"),
+                ("whitman-leaves.txt", "PG1322"),
+            ],
+            columns=["fileid", "pgid"],
         )
-        books.columns = ["NLTK_id", "SPGC_id"]
 
         # build corpi from each source
+        meta = SPGC.metadata()
         corpi = {}
         for book in books.itertuples():
-            corpi[f"{book.SPGC_id}_SPGC"] = SPGC.get(book.SPGC_id)
-            words = list(gutenberg.words(book.NLTK_id))
-            corpi[f"{book.NLTK_id}_NLTK"] = Corpus(words)
+            title = meta.loc[book.pgid].title
+            corpus = SPGC.get(book.pgid)
+            corpi[book.pgid] = ("SPGC", title, corpus)
+            words = gutenberg.words(book.fileid)
+            corpus = Corpus(words)
+            corpi[book.fileid] = ("NLTK", title, corpus)
 
         # fit TTR curve for all & compare RMSE
         results = []
-        for corpus_name, corpus in corpi.items():
+        for corpus_id, (source, title, corpus) in corpi.items():
             corpus.seed = 42
             m_tokens = corpus.TTR.m_tokens.values
             n_types = corpus.TTR.n_types.values
-            realizations = n_types
 
             # log model
-            predictions = LogModel().fit_predict(m_tokens, n_types)
-            rmse = RMSE_pct(realizations, predictions)
+            model = LogModel()
+            predictions = model.fit_predict(m_tokens, n_types)
+            rmse_log = RMSE_pct(n_types, predictions)
+
+            # iseries model
+            predictions = InfSeriesModel(corpus).predict(m_tokens)
+            rmse_iseries = RMSE_pct(n_types, predictions)
 
             # heaps model
             predictions = HeapsModel().fit_predict(m_tokens, n_types)
-            rmse2 = RMSE_pct(realizations, predictions)
+            rmse_heaps = RMSE_pct(n_types, predictions)
 
-            results.append((corpus_name, rmse, rmse2))
+            # append results
+            results.append(
+                (
+                    corpus_id,
+                    title,
+                    source,
+                    corpus.M,
+                    corpus.N,
+                    model.M_z,
+                    model.N_z,
+                    rmse_log,
+                    rmse_iseries,
+                    rmse_heaps,
+                )
+            )
 
         # aggregate & analyze results
-        results = pd.DataFrame(results)
-        results.columns = ["name", "RMSE_pct", "RMSE_pct_heaps"]
-        results["source"] = [name[-4:] for name in results.name]
+        results = pd.DataFrame(
+            results,
+            columns=[
+                "id",
+                "title",
+                "source",
+                "m_tokens",
+                "n_types",
+                "M_z",
+                "N_z",
+                "RMSE_log",
+                "RMSE_iseries",
+                "RMSE_heaps",
+            ],
+        ).set_index("id")
+
+        # save results to data/books.csv
+        results.to_csv("data/books.csv")
 
         # assert log model outperforms heaps
-        assert results.RMSE_pct.max() < 0.01
-        assert results.RMSE_pct_heaps.min() > 0.01
+        assert results.RMSE_log.max() < 0.01
+        assert results.RMSE_heaps.min() > 0.01
 
     # model-fitting tests
     def test_models(self):
