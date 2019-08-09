@@ -8,6 +8,7 @@ from scipy.special import comb as nCr
 from scipy.stats import linregress
 import zipfile
 
+# for SPGC, location of data zip
 DATAPATH = os.getenv("DATAPATH", "data")
 
 

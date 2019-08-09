@@ -8,70 +8,17 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # internal dependencies
-from legomena import Corpus, HeapsModel, InfSeriesModel, LogModel
+from legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
 
-# model comparison over all books, created by test_nltk()
+# model comparison over all books, created by test_spgc_nltk()
 books = pd.read_csv("data/books.csv", index_col=0)
 
-# available books
-def inventory():
-
-    # get metadata
-    fileids = gutenberg.fileids()
-    options = [{"label": fileid, "value": fileid} for fileid in fileids]
-    return options
-
-
-# Fig Data: Real vs. Optimum Type/Token scatterplot
-def graphData():
-    data = [
-        go.Scatter(
-            x=books["tokens"],
-            y=books["types"],
-            name="Actual",
-            text=books["title"],
-            mode="markers",
-        ),
-        go.Scatter(
-            x=books["Mz"],
-            y=books["Nz"],
-            name="Optimum",
-            text=books["title"],
-            mode="markers",
-        ),
+# available sources
+def sources():
+    return [
+        {"label": "NLTK - Natural Language ToolKit", "value": "NLTK"},
+        {"label": "SPGC - Standard Project Gutenberg Corpus", "value": "SPGC"},
     ]
-    layout = go.Layout(
-        title="Actual vs Optimum Type/Token Values",
-        xaxis=dict(title="Corpus Size (Tokens)"),
-        yaxis=dict(title="Vocabulary Size (Types)"),
-    )
-    fig = {"data": data, "layout": layout}
-    return fig
-
-
-# Fig RMSE: RMSE by corpus size
-def graphRMSE():
-    data = [
-        go.Scatter(
-            x=books["tokens"],
-            y=books[col],
-            name=label,
-            text=books["title"],
-            mode="markers",
-        )
-        for col, label in {
-            "RMSE_heaps": "Heap's Law",
-            "RMSE_iseries": "Infinite Series",
-            "RMSE_model": "Logarithmic Model",
-        }.items()
-    ]
-    layout = go.Layout(
-        title="Root Mean Square Error (% of Types)",
-        xaxis=dict(title="Corpus Size (Tokens)"),
-        yaxis=dict(title="RMSE %"),
-    )
-    fig = {"data": data, "layout": layout}
-    return fig
 
 
 # Show plots in dashboard
@@ -83,35 +30,54 @@ app.layout = html.Div(
     [
         html.Div(
             [
-                dcc.Dropdown(
-                    id="book-selector",
-                    options=inventory(),
-                    value="melville-moby_dick.txt",
-                ),
-                dcc.Graph(id="figTTR"),  # TTR Curve
-                dcc.Graph(id="figLego"),  # Hapax & n-legomena proportions
+                dcc.Dropdown(id="source-selector", options=sources(), value="NLTK"),
+                dcc.Dropdown(id="book-selector"),
+                dcc.Graph(id="figTTR"),
+                dcc.Graph(id="figLego"),
             ],
             style=dict(width="50%", display="inline-block"),
         ),
         html.Div(
-            [
-                dcc.Graph(
-                    id="figData", figure=graphData()
-                ),  # actual vs. optimum types by corpus size
-                dcc.Graph(id="figRMSE", figure=graphRMSE()),  # RMSE by corpus size
-            ],
+            [dcc.Graph(id="figData"), dcc.Graph(id="figRMSE")],
             style=dict(width="50%", display="inline-block"),
         ),
     ]
 )
 
+
+@app.callback(Output("book-selector", "options"), [Input("source-selector", "value")])
+def available_books(source):
+
+    # {id:title} by source
+    df = books.query("source == @source")
+    options = [
+        {"label": f"{id} - {row.title}", "value": id} for id, row in df.iterrows()
+    ]
+
+    # return
+    return options
+
+
+@app.callback(Output("book-selector", "value"), [Input("book-selector", "options")])
+def set_default_book(options):
+    return options[0]["value"]
+
+
 # Fig TTR: Actual vs Predicted types = f(tokens)
-@app.callback(Output("figTTR", "figure"), [Input("book-selector", "value")])
-def plotTTR(fileid):
+@app.callback(
+    Output("figTTR", "figure"),
+    [Input("source-selector", "value"), Input("book-selector", "value")],
+)
+def plotTTR(source, fileid):
 
     # retrieve corpus
-    words = gutenberg.words(fileid)
-    corpus = Corpus(words)
+    if source == "NLTK":
+        words = gutenberg.words(fileid)
+        corpus = Corpus(words)
+    else:
+        corpus = SPGC.get(fileid)
+
+    # type-token ratio data
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens.values
     n_types = TTR.n_types.values
@@ -187,12 +153,20 @@ def plotTTR(fileid):
 
 
 # Fig Lego: Hapax & n-legomena proportions as sample size grows
-@app.callback(Output("figLego", "figure"), [Input("book-selector", "value")])
-def plotLego(fileid):
+@app.callback(
+    Output("figLego", "figure"),
+    [Input("source-selector", "value"), Input("book-selector", "value")],
+)
+def plotLego(source, fileid):
 
     # retrieve corpus
-    words = gutenberg.words(fileid)
-    corpus = Corpus(words)
+    if source == "NLTK":
+        words = gutenberg.words(fileid)
+        corpus = Corpus(words)
+    else:
+        corpus = SPGC.get(fileid)
+
+    # type-token ratio data
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens.values
     n_types = TTR.n_types.values
@@ -230,6 +204,45 @@ def plotLego(fileid):
         title="Type & Legomena Proportions",
         xaxis=dict(title="Tokens"),
         yaxis=dict(title="Proportion of Types", tickformat=",.0%"),
+    )
+    fig = {"data": data, "layout": layout}
+    return fig
+
+
+@app.callback(Output("figData", "figure"), [Input("source-selector", "value")])
+def plotData(source):
+    df = books.query("source == @source")
+    data = [
+        go.Scatter(
+            x=df.m_tokens, y=df.n_types, name="Actual", text=df.title, mode="markers"
+        ),
+        go.Scatter(x=df.M_z, y=df.N_z, name="Optimum", text=df.title, mode="markers"),
+    ]
+    layout = go.Layout(
+        title="Actual vs Optimum Type/Token Values",
+        xaxis=dict(title="Corpus Size (Tokens)"),
+        yaxis=dict(title="Vocabulary Size (Types)"),
+        hovermode="closest",
+    )
+    fig = {"data": data, "layout": layout}
+    return fig
+
+
+@app.callback(Output("figRMSE", "figure"), [Input("source-selector", "value")])
+def plotRMSE(source):
+    df = books.query("source == @source")
+    data = [
+        go.Scatter(x=df.m_tokens, y=df[col], name=label, text=df.title, mode="markers")
+        for col, label in {
+            "RMSE_heaps": "Heap's Law",
+            "RMSE_iseries": "Infinite Series",
+            "RMSE_log": "Logarithmic Model",
+        }.items()
+    ]
+    layout = go.Layout(
+        title="Root Mean Square Error (% of Types)",
+        xaxis=dict(title="Corpus Size (Tokens)"),
+        yaxis=dict(title="RMSE %"),
     )
     fig = {"data": data, "layout": layout}
     return fig
