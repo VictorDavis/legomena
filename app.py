@@ -123,30 +123,23 @@ def plotTTR(source, fileid):
             "lego_5_pred": "Pentakis Predicted",
         }.items()
     ]
+    data.append(
+        go.Scatter(
+            x=[lmodel.M_z],
+            y=[lmodel.N_z],
+            name="Optimum Sample",
+            marker=dict(
+                symbol="circle",
+                color="rgba(0,0,0, 0.0)",
+                size=42,
+                line=dict(color="red", width=2),
+            ),
+        )
+    )
     layout = go.Layout(
         title="Type-Token Ratio & N-Legomena Counts",
         xaxis=dict(title="Tokens"),
         yaxis=dict(title="Types"),
-        shapes=[
-            go.layout.Shape(
-                type="line",
-                x0=lmodel.M_z,
-                y0=0,
-                x1=lmodel.M_z,
-                y1=1,
-                yref="paper",
-                line=dict(color="red", width=3),
-            ),
-            go.layout.Shape(
-                type="line",
-                x0=0,
-                y0=lmodel.N_z,
-                x1=1,
-                y1=lmodel.N_z,
-                xref="paper",
-                line=dict(color="red", width=3),
-            ),
-        ],
     )
     fig = {"data": data, "layout": layout}
     return fig
@@ -200,6 +193,19 @@ def plotLego(source, fileid):
             "lego_5_pred": "Pentakis Predicted",
         }.items()
     ]
+    data.append(
+        go.Scatter(
+            x=[lmodel.M_z],
+            y=[0.5],
+            name="Optimum Sample",
+            marker=dict(
+                symbol="circle",
+                color="rgba(0,0,0, 0.0)",
+                size=42,
+                line=dict(color="red", width=2),
+            ),
+        )
+    )
     layout = go.Layout(
         title="Type & Legomena Proportions",
         xaxis=dict(title="Tokens"),
