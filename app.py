@@ -3,29 +3,22 @@ import dash
 from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_html_components as html
+from nltk.corpus import gutenberg
 import pandas as pd
 import plotly.graph_objects as go
 
 # internal dependencies
-from legomena import SPGC, HeapsModel, InfSeriesModel, LogModel
+from legomena import Corpus, HeapsModel, InfSeriesModel, LogModel
 
-# remember to set to False
-TESTING = True
-
-# all have to be read into memory?!
+# model comparison over all books, created by test_nltk()
 books = pd.read_csv("data/books.csv", index_col=0)
 
 # available books
 def inventory():
-    """Return all books in the Standard Project Gutenberg Corpus"""
 
     # get metadata
-    df = SPGC.metadata()
-    if TESTING:
-        df = df.head()
-    options = [
-        {"label": f"{id} - {book.title}", "value": id} for id, book in df.iterrows()
-    ]
+    fileids = gutenberg.fileids()
+    options = [{"label": fileid, "value": fileid} for fileid in fileids]
     return options
 
 
@@ -90,7 +83,11 @@ app.layout = html.Div(
     [
         html.Div(
             [
-                dcc.Dropdown(id="book-selector", options=inventory(), value="PG1"),
+                dcc.Dropdown(
+                    id="book-selector",
+                    options=inventory(),
+                    value="melville-moby_dick.txt",
+                ),
                 dcc.Graph(id="figTTR"),  # TTR Curve
                 dcc.Graph(id="figLego"),  # Hapax & n-legomena proportions
             ],
@@ -110,10 +107,11 @@ app.layout = html.Div(
 
 # Fig TTR: Actual vs Predicted types = f(tokens)
 @app.callback(Output("figTTR", "figure"), [Input("book-selector", "value")])
-def plotTTR(bookid):
+def plotTTR(fileid):
 
     # retrieve corpus
-    corpus = SPGC.get(bookid)
+    words = gutenberg.words(fileid)
+    corpus = Corpus(words)
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens.values
     n_types = TTR.n_types.values
@@ -190,10 +188,11 @@ def plotTTR(bookid):
 
 # Fig Lego: Hapax & n-legomena proportions as sample size grows
 @app.callback(Output("figLego", "figure"), [Input("book-selector", "value")])
-def plotLego(bookid):
+def plotLego(fileid):
 
     # retrieve corpus
-    corpus = SPGC.get(bookid)
+    words = gutenberg.words(fileid)
+    corpus = Corpus(words)
     TTR = corpus.TTR
     m_tokens = TTR.m_tokens.values
     n_types = TTR.n_types.values
