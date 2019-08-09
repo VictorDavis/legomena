@@ -78,7 +78,7 @@ class LegomenaTest(unittest.TestCase):
 
         # metadata()
         df = SPGC.metadata()
-        assert df.shape == (56466, 8)
+        assert df.shape == (56395, 8)
         df = SPGC.metadata(language="en")
         assert df.shape == (45790, 8)
         df = SPGC.metadata(language="xx")
