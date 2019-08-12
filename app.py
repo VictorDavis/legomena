@@ -4,9 +4,9 @@ from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_html_components as html
 from nltk.corpus import gutenberg
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from scipy.stats import linregress
 
 # internal dependencies
 from legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
@@ -226,10 +226,10 @@ def plotData(source):
 
     # filter to source
     df = books.query("source == @source")
+    df = df.sort_values("N_z")
 
-    # linear regression N_z = f(M_z)
-    slope, intercept, rvalue, _, _ = linregress(x=df.M_z, y=df.N_z)
-    df["N_z_pred"] = intercept + slope * df.M_z
+    # M_z = N_z ( H[N_z+1] -1 ) ~ = N_z ( -1 + gamma + log(N_z) )
+    df["M_z_pred"] = df.N_z * (-1 + np.euler_gamma + np.log(df.N_z + 1))
 
     # build figure
     data = [
@@ -237,10 +237,10 @@ def plotData(source):
             x=df.m_tokens, y=df.n_types, name="Actual", text=df.title, mode="markers"
         ),
         go.Scatter(x=df.M_z, y=df.N_z, name="Optimum", text=df.title, mode="markers"),
-        go.Scatter(x=df.M_z, y=df.N_z_pred, mode="lines", name="Best Fit"),
+        go.Scatter(x=df.M_z_pred, y=df.N_z, mode="lines", name="Harmony"),
     ]
     layout = go.Layout(
-        title=f"Actual vs Optimum Type/Token Counts (Best Fit slope={slope:0.4f}, r={rvalue:0.4})",
+        title=f"Actual vs Optimum Type/Token Counts",
         xaxis=dict(title="Corpus Size (Tokens)"),
         yaxis=dict(title="Vocabulary Size (Types)"),
         hovermode="closest",
