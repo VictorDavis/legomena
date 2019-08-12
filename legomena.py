@@ -69,6 +69,7 @@ class HeapsModel:
 
         # allow scalar
         return_scalar = np.isscalar(m_tokens)
+        m_tokens = np.array(m_tokens).reshape(-1)
 
         # run model
         K, B = self.params
@@ -78,7 +79,8 @@ class HeapsModel:
 
         # allow scalar
         if return_scalar:
-            n_types = n_types.squeeze()
+            assert len(n_types) == 1
+            n_types = n_types[0]
 
         # return
         return n_types
@@ -615,7 +617,10 @@ class Corpus(Counter):
 
         # sample
         m = m or int(x * self.M)
-        random_state = np.random.RandomState(self.seed + m)
+        seed = self.seed
+        if seed:
+            seed = seed + m  # salt
+        random_state = np.random.RandomState(seed)
         tokens = random_state.choice(self.tokens, m, replace=False)
         corpus = Corpus(tokens)
         return corpus
@@ -672,9 +677,9 @@ class InfSeriesModel:
 
         # allow scalar
         return_scalar = np.isscalar(m_tokens)
+        m_tokens = np.array(m_tokens).reshape(-1)
 
         # sum over legomena coefficients k
-        m_tokens = np.array(m_tokens).reshape(-1)
         x = m_tokens / self.M
         exponents = range(len(self.k))
         terms = np.array([np.power(1 - x, n) for n in exponents])
@@ -685,7 +690,8 @@ class InfSeriesModel:
 
         # allow scalar
         if return_scalar:
-            n_types = n_types.squeeze()
+            assert len(n_types) == 1
+            n_types = n_types[0]
 
         # return
         return n_types

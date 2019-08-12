@@ -82,7 +82,7 @@ class LegomenaTest(unittest.TestCase):
         df = SPGC.metadata()
         assert df.shape == (56395, 8)
         df = SPGC.metadata(language="en")
-        assert df.shape == (45790, 8)
+        assert df.shape == (45720, 8)
         df = SPGC.metadata(language="xx")
         assert df.shape == (0, 8)
 
@@ -201,7 +201,7 @@ class LegomenaTest(unittest.TestCase):
         # fit Heap's Law model to TTR curve
         hmodel = HeapsModel().fit(m_tokens, n_types)
         predictions_heaps = hmodel.predict(m_tokens)
-        assert hmodel.predict(1000) == 764
+        assert hmodel.predict(1000) == 760
 
         # infinite series
         imodel = InfSeriesModel(corpus)
@@ -211,7 +211,7 @@ class LegomenaTest(unittest.TestCase):
         # fit logarithmic model to TTR curve
         lmodel = LogModel().fit(m_tokens, n_types)
         predictions_log = lmodel.predict(m_tokens)
-        assert lmodel.predict(1000) == 519
+        assert lmodel.predict(1000) == 515
 
         # draw pretty pictures
         if GRAPHICS_ON:
