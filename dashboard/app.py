@@ -55,7 +55,7 @@ def available_books(source):
     # {id:title} by source
     df = books.query("source == @source")
     options = [
-        {"label": f"{id} - {row.title}", "value": id} for id, row in df.iterrows()
+        {"label": "%s - %s" % (id, row.title), "value": id} for id, row in df.iterrows()
     ]
 
     # return
@@ -101,7 +101,7 @@ def plotTTR(source, fileid):
     k_pred = lmodel.predict_k(TTR.m_tokens)
     dim = k_pred.shape[1]
     for n in range(dim):
-        TTR[f"lego_{n}_pred"] = k_pred[:, n]
+        TTR["lego_%s_pred" % n] = k_pred[:, n]
 
     # build figure
     data = [
@@ -175,8 +175,10 @@ def plotLego(source, fileid):
     k_pred = lmodel.predict_k(m_tokens, normalize=True)
     dim = k_pred.shape[1]
     for n in range(dim):
-        TTR[f"lego_{n}"] = TTR[f"lego_{n}"] / TTR.n_types
-        TTR[f"lego_{n}_pred"] = k_pred[:, n]
+        actual = "lego_%s" % n
+        predicted = "lego_%s_pred" % n
+        TTR[actual] = TTR[actual] / TTR.n_types
+        TTR[predicted] = k_pred[:, n]
 
     # build figure
     data = [
@@ -240,7 +242,7 @@ def plotData(source):
         go.Scatter(x=df.M_z_pred, y=df.N_z, mode="lines", name="Harmony"),
     ]
     layout = go.Layout(
-        title=f"Actual vs Optimum Type/Token Counts",
+        title="Actual vs Optimum Type/Token Counts",
         xaxis=dict(title="Corpus Size (Tokens)"),
         yaxis=dict(title="Vocabulary Size (Types)"),
         hovermode="closest",
