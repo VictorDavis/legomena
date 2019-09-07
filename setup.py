@@ -13,8 +13,6 @@ setup(
     author_email="vadsql@gmail.com",
     url="http://legomena.herokuapp.com/",
     packages=["legomena"],
-    package_dir = {'': 'scripts'},
-    packages = find_packages('scripts', exclude=['dashboard']),
     install_requires=["nltk", "numpy", "pandas", "scipy"],
     scripts=["scripts/legomena"],
 )
