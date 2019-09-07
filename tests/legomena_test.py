@@ -246,7 +246,7 @@ class LegomenaTest(unittest.TestCase):
             # Logarithmic Model
             plt.scatter(m_tokens, n_types)
             plt.plot(m_tokens, predictions_log, color="red")
-            plt.title(f"Logarithmic Model (M_z, N_z) = (%s, %s)" % lmodel.params)
+            plt.title("Logarithmic Model (M_z, N_z) = (%s, %s)" % lmodel.params)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()

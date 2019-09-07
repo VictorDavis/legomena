@@ -705,8 +705,12 @@ class SPGC:
     Snapshot downloaded from: https://zenodo.org/record/2422561/files/SPGC-counts-2018-07-18.zip
     """
 
-    # get corpus by Project Gutenberg book ID
-    def get(pgid: int) -> Corpus:
+    # counts file
+    fcounts = "SPGC-counts-2018-07-18"
+    fmeta = "SPGC-metadata-2018-07-18"
+
+    @classmethod
+    def get(cls, pgid: int) -> Corpus:
         """
         Retrieves word frequency distribution for book by PGID
         :param pgid: (int or str) Project Gutenberg book ID, ex get(2701) or get("PG2701")
@@ -716,12 +720,11 @@ class SPGC:
         # convert int -> str
         pgid = str(pgid)
         if pgid[:2] != "PG":
-            pgid = f"PG{pgid}"
+            pgid = "PG%s" % pgid
 
         # extract contents of "counts" text file
-        SPGC = "SPGC-counts-2018-07-18"
-        zname = f"{DATAPATH}/{SPGC}.zip"
-        fname = f"{SPGC}/{pgid}_counts.txt"
+        zname = "%s/%s.zip" % (DATAPATH, cls.fcounts)
+        fname = "%s/%s_counts.txt" % (cls.fcounts, pgid)
         fobj = None
         try:
             z = zipfile.ZipFile(zname)
@@ -733,7 +736,8 @@ class SPGC:
         # check for text file
         if fobj is None:
             try:
-                fobj = open(f"{DATAPATH}/{fname}")
+                fpath = "%s/%s" % (DATAPATH, fname)
+                fobj = open(fpath)
             except Exception as e:
                 print(e)
                 raise (e)
@@ -746,25 +750,25 @@ class SPGC:
         # return corpus object
         return corpus
 
-    # get SPGC metadata from csv
-    def metadata(language: str = None) -> pd.DataFrame:
+    @classmethod
+    def metadata(cls, language: str = None) -> pd.DataFrame:
         """
         Retrieves metadata.csv and returns as dataframe.
         :param language: (optional) 2-letter language code, 'en', 'fr', etc
         """
 
         # read csv
-        fname = f"{DATAPATH}/SPGC-metadata-2018-07-18.csv"
+        fname = "%s/%s.csv" % (DATAPATH, cls.fmeta)
         df = pd.read_csv(fname).set_index("id")
         df = df[~df.title.isna()]
 
         # strip out "sound" entries
         df = df.query('type == "Text"')
-        assert df.shape == (56395, 8), f"ERROR: Corrupted SPGC file {fname}."
+        assert df.shape == (56395, 8), "ERROR: Corrupted SPGC file %s" % fname
 
         # filter language
         if language is not None:
-            language = f"['{language}']"
+            language = "['%s']" % language
             df = df.query("language == @language")
 
         # return
