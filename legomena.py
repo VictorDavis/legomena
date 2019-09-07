@@ -20,7 +20,7 @@ class HeapsModel:
     _params = None
 
     @property
-    def params(self) -> HeapsParams:
+    def params(self) -> tuple:  # HeapsParams
         assert (
             self._params is not None
         ), "Please use .fit(m_tokens, n_types) to fit the model."
@@ -214,7 +214,7 @@ class LogModel:
     )
 
     @property
-    def params(self) -> LogParams:
+    def params(self) -> tuple:  # LogParams
         assert (
             self._params is not None
         ), "Please use .fit(m_tokens, n_types) to fit the model."
@@ -235,7 +235,7 @@ class LogModel:
         return self.params.N_z
 
     @property
-    def options(self) -> UserOptions:
+    def options(self) -> tuple:  # UserOptions
         """Misc low-impact options when evaluating the log formula."""
         return self._options
 
@@ -513,7 +513,7 @@ class Corpus(Counter):
         return n_types
 
     @property
-    def options(self) -> UserOptions:
+    def options(self) -> tuple:  # UserOptions
         """Misc low-impact options when computing the TTR curve."""
         return self._options
 
