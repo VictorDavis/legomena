@@ -1,6 +1,6 @@
 from setuptools import setup
 
-with open("README", "r") as f:
+with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(
@@ -12,6 +12,5 @@ setup(
     author="Victor Davis",
     author_email="vadsql@gmail.com",
     url="http://legomena.herokuapp.com/",
-    packages=["legomena"],
     install_requires=["nltk", "numpy", "pandas", "scipy"],
 )
