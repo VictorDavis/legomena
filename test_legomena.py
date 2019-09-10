@@ -1,4 +1,7 @@
 # bloody dependencies
+import nltk
+
+nltk.download("gutenberg")
 from nltk.corpus import gutenberg
 import numpy as np
 import pandas as pd
