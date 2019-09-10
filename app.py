@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # internal dependencies
-from scripts.legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
+from legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
 
 # model comparison over all books, created by test_spgc_nltk()
 books = pd.read_csv("data/books.csv", index_col=0)
