@@ -14,5 +14,4 @@ setup(
     url="http://legomena.herokuapp.com/",
     packages=["legomena"],
     install_requires=["nltk", "numpy", "pandas", "scipy"],
-    scripts=["scripts/legomena"],
 )
