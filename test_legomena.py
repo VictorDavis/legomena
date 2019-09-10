@@ -6,7 +6,7 @@ from scipy.stats import linregress
 import unittest
 
 # classes to test
-from ..legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeriesModel
+from legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeriesModel
 
 # globals
 GRAPHICS_ON = False
