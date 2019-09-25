@@ -12,11 +12,11 @@ In my previous paper [ref 1], I derived a novel formula describing the type-toke
 - $(M_z, N_z) = $ The "optimum sample size" of a corpus [ ref 1 ]
 - $(xM_z, yN_z)$ = The size of a sample drawn from a corpus
 - $(x, y(x)) = $ The *normalized* sample size as *( proportion of tokens drawn, proportion of types drawn )*
-- $x =$ The *proportion* of tokens drawn from a corpus *relative to the optimum number of tokens*.
-- $y(x) =$ The *proportion* of types drawn from a corpus *relative to the number of types in an optimum sample*.
+- $x =$ The *proportion* of tokens drawn from an optimum sample.
+- $y(x) =$ The *proportion* of types drawn from an optimum sample.
 - $k_n(x) =$ The *number* of $n$-legomena in a sample. The *number* of types which repeat exactly $n$ times.
 - $\hat{k}_n(x) = k_n(x) / N_z = $ The *proportion* of types which repeat exactly $n$ times *relative to the number of types in an optimum sample*.
-- $p(x) = k_n(x)/y(x) = $ The *proportion* of types which repeat exactly $n$ times *relative to the number of types drawn*.
+- $p_n(x) = \hat{k}_n(x)/y(x) = $ The *proportion* of types which repeat exactly $n$ times *relative to the number of types drawn*.
 
 ## Recap
 
@@ -31,7 +31,7 @@ y(x) = \frac{\ln(x)x}{x-1} \\
 \hat{k}_5(x) = \frac{12x^6+65x^5-60x^5\ln(x)-120x^4+60x^3-20x^2+3x}{60(x-1)^6} \\
 $$
 
-
+These can be derived by manipulating the infinite series defining $y(x)$ and by applying a recurrence relation to obtain $k_n(x)$ for arbitrary $n$. This still leaves us wanting a closed form expression.
 
 
 ## The Lerch Transcendent
@@ -44,6 +44,48 @@ y(x) = \frac{x\ln x}{x-1} = \phi\bigg(\frac{x-1}{x}, 1, 1\bigg) \\
 p_n(x) = \frac{1}{n\ln{x}} - \frac{1}{x\ln{x}}\phi\bigg(\frac{x-1}{x}, 1, n\bigg) \\
 $$
 
+## 0. Derivation
+
+In my original paper, I defined $\hat{k}_n(x)$ as an infinite series, but did not explicitly derive the logarithmic formulas (which can be done relatively easily using basic series manipulation). Here I will connect the dots from the original series definition to the above Lerch form, for completeness' sake and to capture the appropriate nuance.
+
+**Lemma 0.1**: We'll take advantage of the following Lerch function identity.
+$$
+\phi(z,s,a) = \frac{1}{1-z}\sum_{i=0}^\infty \bigg(\frac{-z}{1-z}\bigg)^i \sum_{j=0}^i {i \choose j}(a+j)^{-s} \\
+\phi\bigg(\frac{x-1}{x},1,n\bigg) = x\sum_{i=0}^\infty (1-x)^i \sum_{j=0}^i {i \choose j}(n+j)^{-1} \\
+= x\sum_{i=0}^\infty \frac{1}{n}{i+n \choose i}^{-1}(1-x)^i \\
+$$
+Now, let's start with the original definition of $k_n(x)$.
+$$
+\hat{k}_n(x) = \sum_{i=n}^\infty {i \choose n}k_ix^n(1-x)^{i-n} \\
+= x^n \sum_{i=0}^\infty {n+i \choose i}k_{n+i}(1-x)^i \\
+= x^n \sum_{i=0}^\infty {n+i \choose i}\frac{1}{(n+i)(n+i+1)}(1-x)^i \\
+= x^n \sum_{i=0}^\infty a_n^{(i)}(1-x)^i \\
+= x^n A_n(1-x) \\
+= \frac{x}{n} B_n(1-x)
+$$
+For $A_n(1-x)$ a placeholder for the generating function for the sequence $a_n = \{a _n^{(i)}\}$. Let's take the difference operation on $a_n$ a total of $n-1$ times, resulting in $B_n(1-x) = x^{n-1}A(1-x)$
+
+**Lemma 0.1**: Without proving it, we'll make use of this identity.
+$$
+\sum_{j=0}^{n-1} (-1)^j{n-1 \choose j}a_n^{(i-j)}
+= \sum_{j=0}^{n-1} \frac{(-1)^j{n-1 \choose j}{n+i-j \choose i-j}}{(n+i-j)(n+1+i-j)}
+= \frac{1}{n}{n+i+1 \choose i+1}^{-1}
+$$
+And proceed...
+$$
+x^n A_n(1-x)
+= x^n \sum_{i=0}^\infty a_n^{(i)}(1-x)^i \\
+= x \sum_{i=0}^\infty \sum_{j=0}^{n-1} (-1)^j{n-1 \choose j}a_n^{(i-j)}(1-x)^i \\
+= x \sum_{i=0}^\infty \frac{1}{n}{n+i+1 \choose i+1}^{-1}(1-x)^i \\
+= \frac{x}{n} \sum_{i=0}^\infty {n+i+1 \choose i+1}^{-1}(1-x)^i \\
+= \frac{x}{n} \sum_{i=1}^\infty {n+i \choose i}^{-1}(1-x)^{i-1} \\
+= \frac{1}{n}\frac{x}{1-x} \sum_{i=1}^\infty {n+i \choose i}^{-1}(1-x)^i \\
+= \frac{1}{n}\frac{x}{x-1} \bigg(-\sum_{i=1}^\infty {n+i \choose i}^{-1}(1-x)^i\bigg) \\
+= \frac{1}{n}\frac{x}{x-1} \bigg(1-\sum_{i=0}^\infty {n+i \choose i}^{-1}(1-x)^i\bigg) \\
+= \frac{1}{n}\frac{x}{x-1}-\frac{x}{x-1}\sum_{i=0}^\infty \frac{1}{n}{n+i \choose i}^{-1}(1-x)^i \\
+= \frac{1}{n}\frac{x}{x-1}-\frac{x}{x-1}\phi\bigg(\frac{x-1}{x},1,n\bigg) \\
+$$
+
 ## 1. Limiting Behavior
 
 Taking $x$ to be *the proportion of the optimum corpus sampled*, the special value of $x=1$ represents *the optimum sample of the corpus*. Since the concept of $n$-legomena proportions is well-defined, it seems surprising to have a singularity at such an important point. Using the generalized formula, we can eliminate it.
@@ -51,7 +93,7 @@ Taking $x$ to be *the proportion of the optimum corpus sampled*, the special val
 **Lemma 1.1:**
 $$
 \hat{k}_n(x) = \frac{1}{n}\bigg(\frac{x}{x-1}\bigg) - \frac{1}{x-1}\phi\bigg(\frac{x-1}{x}, 1, n\bigg) \\
-= \frac{1}{n}\bigg(\frac{x}{x-1}\bigg) - \frac{1}{x-1}\sum_{i=0}^{\infty} \frac{1}{n+i}\bigg(\frac{x-1}{x}\bigg) \\
+= \frac{1}{n}\bigg(\frac{x}{x-1}\bigg) - \frac{1}{x-1}\sum_{i=0}^{\infty} \frac{1}{n+i}\bigg(\frac{x-1}{x}\bigg)^i \\
 = \frac{1}{n}\bigg(\frac{x}{x-1}\bigg) - \frac{1}{x-1}\bigg[\frac{1}{n} + \sum_{i=1}^{\infty} \frac{1}{n+i}\bigg(\frac{x-1}{x}\bigg)^i\bigg] \\
 = \frac{1}{n}\bigg(\frac{x}{x-1}\bigg) - \frac{1}{n}\bigg(\frac{1}{x-1}\bigg) - \frac{1}{x-1}\sum_{i=1}^{\infty} \frac{1}{n+i}\bigg(\frac{x-1}{x}\bigg)^i \\
 = \frac{1}{n} - \sum_{i=1}^{\infty} \frac{1}{n+i}\frac{(x-1)^{i-1}}{x^i} \\
@@ -67,19 +109,8 @@ $$
 = \frac{1}{n(n+1)}
 $$
 
-
 **Theorem 1.2**: The proportions of $n$-legomena tend toward a perfect harmonic distribution in the limit: $\hat{k}_n(+\infty) = \frac{1}{n} = 1, \frac{1}{2}, \frac{1}{3}, \frac{1}{4}, \frac{1}{5}, ...$
 
-**Theorem 1.3:** The number of types never stops growing: $\lim_{x \to \infty} y(x)$ diverges.
-
-**Lemma:**
-$$
-
-$$
-**Proof 1.1:**
-$$
-
-$$
 **Proof 1.2**
 $$
 \lim_{x \to \infty} \hat{k}_n(x) = \lim_{x \to \infty} \frac{1}{n} - \sum_{i=1}^{\infty} \frac{1}{n+i}\frac{(x-1)^{i-1}}{x^i} \\
@@ -87,6 +118,8 @@ $$
 = \frac{1}{n} - 0 \\
 = \frac{1}{n}
 $$
+
+**Theorem 1.3:** The number of types never stops growing: $\lim_{x \to \infty} y(x)$ diverges.
 
 ## 2. Derivatives
 
