@@ -1,14 +1,14 @@
 # bloody dependencies
 from collections import Counter, namedtuple
 import numpy as np
-import os
 import pandas as pd
+from pathlib import PosixPath
 from scipy.optimize import fsolve, curve_fit
 from scipy.special import comb as nCr
 from scipy.stats import linregress
 
 # for SPGC, location of data zip
-DATAPATH = os.getenv("DATAPATH", "data")
+DATAPATH = PosixPath("data")
 
 
 class HeapsModel:
@@ -740,7 +740,7 @@ class SPGC:
             pgid = "PG%s" % pgid
 
         # build corpus from frequency distribution
-        fname = "%s/%s/%s_counts.txt" % (DATAPATH, cls.fcounts, pgid)
+        fname = DATAPATH / cls.fcounts / ("%s_counts.txt" % pgid)
         try:
             with open(fname) as f:
                 df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
@@ -767,7 +767,7 @@ class SPGC:
         """
 
         # read csv
-        fname = "%s/%s.csv" % (DATAPATH, cls.fmeta)
+        fname = DATAPATH / ("%s.csv" % cls.fmeta)
         df = pd.read_csv(fname).set_index("id")
         df = df[~df.title.isna()]
 
