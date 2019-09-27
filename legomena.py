@@ -6,7 +6,6 @@ import pandas as pd
 from scipy.optimize import fsolve, curve_fit
 from scipy.special import comb as nCr
 from scipy.stats import linregress
-import zipfile
 
 # for SPGC, location of data zip
 DATAPATH = os.getenv("DATAPATH", "data")
@@ -708,6 +707,24 @@ class SPGC:
     # counts file
     fcounts = "SPGC-counts-2018-07-18"
     fmeta = "SPGC-metadata-2018-07-18"
+    weburl = "https://zenodo.org/record/2422561"
+
+    @classmethod
+    def download(cls):
+        """
+        Downloads SPGC data from weburl
+        Extracts it into data/
+        """
+
+        # credit: https://svaderia.github.io/articles/downloading-and-unzipping-a-zipfile/
+        from io import BytesIO
+        from urllib.request import urlopen
+        from zipfile import ZipFile
+
+        zipurl = "%s/files/%s.zip" % (cls.weburl, cls.fcounts)
+        with urlopen(zipurl) as zipresp:
+            with ZipFile(BytesIO(zipresp.read())) as zfile:
+                zfile.extractall(DATAPATH)
 
     @classmethod
     def get(cls, pgid: int) -> Corpus:
@@ -722,28 +739,20 @@ class SPGC:
         if pgid[:2] != "PG":
             pgid = "PG%s" % pgid
 
-        # extract contents of "counts" text file
-        zname = "%s/%s.zip" % (DATAPATH, cls.fcounts)
-        fname = "%s/%s_counts.txt" % (cls.fcounts, pgid)
-        fobj = None
-        try:
-            z = zipfile.ZipFile(zname)
-            fobj = z.open(fname)
-            z.close()
-        except Exception as e:
-            print(e)  # print but do not raise
-
-        # check for text file
-        if fobj is None:
-            try:
-                fpath = "%s/%s" % (DATAPATH, fname)
-                fobj = open(fpath)
-            except Exception as e:
-                print(e)
-                raise (e)
-
         # build corpus from frequency distribution
-        df = pd.read_csv(fobj, delimiter="\t", header=None, names=["word", "freq"])
+        fname = "%s/%s/%s_counts.txt" % (DATAPATH, cls.fcounts, pgid)
+        try:
+            with open(fname) as f:
+                df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
+                f.close()
+        except (FileNotFoundError) as e:
+            print(
+                "File %s not found! Call SPGC.download() to download all SPGC data."
+                % fname
+            )
+            raise e
+
+        # build corpus
         asdict = {row.word: row.freq for row in df.itertuples()}
         corpus = Corpus(asdict)
 

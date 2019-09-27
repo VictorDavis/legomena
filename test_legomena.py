@@ -78,7 +78,7 @@ class LegomenaTest(unittest.TestCase):
         assert corpus2 == corpus
         assert corpus.M == 210258
         assert corpus.N == 16402
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(FileNotFoundError) as context:
             corpus = SPGC.get(999999)
 
         # metadata()
