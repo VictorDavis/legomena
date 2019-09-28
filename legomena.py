@@ -2,13 +2,20 @@
 from collections import Counter, namedtuple
 import numpy as np
 import pandas as pd
-from pathlib import PosixPath
+from pathlib import Path
 from scipy.optimize import fsolve, curve_fit
 from scipy.special import comb as nCr
 from scipy.stats import linregress
 
-# for SPGC, location of data zip
-DATAPATH = PosixPath("data")
+
+def get_project_root() -> Path:
+    """Returns project root folder."""
+    return Path(__file__).parent
+
+
+def get_data_path() -> Path:
+    """Returns project data folder."""
+    return get_project_root() / "data"
 
 
 class HeapsModel:
@@ -724,7 +731,8 @@ class SPGC:
         zipurl = "%s/files/%s.zip" % (cls.weburl, cls.fcounts)
         with urlopen(zipurl) as zipresp:
             with ZipFile(BytesIO(zipresp.read())) as zfile:
-                zfile.extractall(DATAPATH)
+                data_path = get_data_path()
+                zfile.extractall(data_path)
 
     @classmethod
     def get(cls, pgid: int) -> Corpus:
@@ -740,7 +748,8 @@ class SPGC:
             pgid = "PG%s" % pgid
 
         # build corpus from frequency distribution
-        fname = DATAPATH / cls.fcounts / ("%s_counts.txt" % pgid)
+        data_path = get_data_path()
+        fname = data_path / cls.fcounts / ("%s_counts.txt" % pgid)
         try:
             with open(fname) as f:
                 df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
@@ -767,7 +776,8 @@ class SPGC:
         """
 
         # read csv
-        fname = DATAPATH / ("%s.csv" % cls.fmeta)
+        data_path = get_data_path()
+        fname = data_path / ("%s.csv" % cls.fmeta)
         df = pd.read_csv(fname).set_index("id")
         df = df[~df.title.isna()]
 
