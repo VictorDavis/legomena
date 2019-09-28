@@ -5,7 +5,7 @@ on:
     branches:
     - master
     - release/*
-    - git-actions
+    - dev/*
 
 jobs:
   build:
