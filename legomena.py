@@ -649,7 +649,7 @@ class SPGC:
         data_path = get_data_path()
         fname = data_path / cls.fcounts / ("%s_counts.txt" % pgid)
         try:
-            with open(fname) as f:
+            with fname.open() as f:
                 df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
                 f.close()
         except (FileNotFoundError) as e:
