@@ -8,7 +8,7 @@ import pandas as pd
 import unittest
 
 # classes to test
-from legomena import Corpus, SPGC, HeapsModel, KTransformer, LogModel, InfSeriesModel
+from legomena import Corpus, SPGC, HeapsModel, LogModel, InfSeriesModel
 
 # globals
 GRAPHICS_ON = False
@@ -251,66 +251,6 @@ class LegomenaTest(unittest.TestCase):
             plt.title("Logarithmic Model (M_z, N_z) = (%s, %s)" % lmodel.params)
             plt.xlabel("tokens")
             plt.ylabel("types")
-            plt.show()
-
-    # test legomena models
-    def test_legomena(self):
-
-        # initialize class
-        corpus = SPGC.get(PGID)
-
-        ## TODO: memory intensive, is this even needed?
-
-        # # calculate transformation matrix A_x
-        # D = 5
-        # A_0 = np.concatenate((np.ones(D).reshape(1, D), np.zeros((D - 1, D))), axis=0)
-        # A_1 = np.identity(D)
-        # assert np.array_equal(KTransformer.A_x(0.0, D), A_0)
-        # assert np.array_equal(KTransformer.A_x(1.0, D), A_1)
-        # A_half = KTransformer.A_x(0.5, D)
-        #
-        # # transform k to k'
-        # # NOTE: computationally, transform matrix can only handle 1024x1024 dimensions, thus output len(k') <= 1024
-        # k_0 = KTransformer.transform(corpus.k, 0)  # k'(0) = [N, 0, 0, 0, ..., 0]
-        # k_1 = KTransformer.transform(corpus.k, 1)  # k'(1) = [0, k1, k2, k3, ...]
-        # assert np.array_equal(
-        #     k_1, corpus.k
-        # )  # sample 100% of the corpus and assert k'=k
-        # assert all(k_0[1:] == 0)
-        # assert k_0[0] == corpus.N
-
-        # build n-legomena curves
-        corpus.dimension = 5
-        corpus.seed = SEED
-        TTR = corpus.TTR
-
-        # generate predictions
-        m_choices = TTR.m_tokens  # counts
-        x_choices = m_choices / corpus.M  # proportions
-        k_matrix = KTransformer.transform(corpus.k, x_choices)
-
-        # draw pretty pictures
-        if GRAPHICS_ON:
-            import matplotlib.pyplot as plt
-
-            # predicted hapaxes
-            predictions = k_matrix[:, 1]
-            realization = TTR.lego_1
-            plt.scatter(TTR.m_tokens, realization)
-            plt.plot(TTR.m_tokens, predictions, color="red")
-            plt.title("Hapax-Token Relation")
-            plt.xlabel("tokens")
-            plt.ylabel("hapaxes")
-            plt.show()
-
-            # predicted hapaxes proportions
-            predictions = k_matrix[:, 1] / (corpus.N - k_matrix[:, 0])
-            realization = TTR.lego_1 / TTR.n_types
-            plt.scatter(TTR.m_tokens, realization)
-            plt.plot(TTR.m_tokens, predictions, color="red")
-            plt.title("Hapax-Token Relation (fraction)")
-            plt.xlabel("tokens")
-            plt.ylabel("hapax fraction")
             plt.show()
 
     # functions for finding optimum sample size M_z, N_z
