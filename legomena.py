@@ -367,7 +367,7 @@ class Corpus(Counter):
     @property
     def tokens(self) -> list:
         """The bag of words, list-like of elements of any type."""
-        tokens_ = list(self.elements())
+        tokens_ = sorted(list(self.elements()))
         return tokens_
 
     @property
