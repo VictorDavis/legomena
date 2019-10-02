@@ -355,6 +355,8 @@ class Corpus(Counter):
     # object properties
     _k = None  # k-vector of n-legomena counts
     _TTR = None  # dataframe containing type/token counts from corpus samples
+    _tokens = None  # memoized list of tokens
+    _types = None  # memoized list of types
 
     # user options
     UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed"))
@@ -367,15 +369,19 @@ class Corpus(Counter):
     @property
     def tokens(self) -> list:
         """The bag of words, list-like of elements of any type."""
-        tokens_ = list(self.elements())
-        return tokens_
+        if self._tokens is None:
+            tokens_ = sorted(list(self.elements()))
+            self._tokens = tokens_
+        return self._tokens
 
     @property
     def types(self) -> list:
         """The lexicon, ranked by frequency."""
-        fdist = self.fdist  # ranked order
-        types_ = list(fdist.type.values)
-        return types_
+        if self._types is None:
+            fdist = self.fdist  # ranked order
+            types_ = list(fdist.type.values)
+            self._types = types_
+        return self._types
 
     @property
     def fdist(self) -> pd.DataFrame:
@@ -649,7 +655,7 @@ class SPGC:
         data_path = get_data_path()
         fname = data_path / cls.fcounts / ("%s_counts.txt" % pgid)
         try:
-            with open(fname) as f:
+            with fname.open() as f:
                 df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
                 f.close()
         except (FileNotFoundError) as e:
@@ -660,7 +666,7 @@ class SPGC:
             raise e
 
         # build corpus
-        asdict = {row.word: row.freq for row in df.itertuples()}
+        asdict = {str(row.word): int(row.freq) for row in df.itertuples()}
         corpus = Corpus(asdict)
 
         # return corpus object

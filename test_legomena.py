@@ -203,17 +203,20 @@ class LegomenaTest(unittest.TestCase):
         # fit Heap's Law model to TTR curve
         hmodel = HeapsModel().fit(m_tokens, n_types)
         predictions_heaps = hmodel.predict(m_tokens)
-        assert hmodel.predict(1000) == 760
+        H = hmodel.predict(1000)
 
         # infinite series
         imodel = InfSeriesModel(corpus)
         predictions_iseries = imodel.predict(m_tokens)
-        assert imodel.predict(1000) == 513
+        I = imodel.predict(1000)
 
         # fit logarithmic model to TTR curve
         lmodel = LogModel().fit(m_tokens, n_types)
         predictions_log = lmodel.predict(m_tokens)
-        assert lmodel.predict(1000) == 515
+        L = lmodel.predict(1000)
+
+        # explicit check
+        assert (H, I, L) == (756, 513, 515)
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -341,6 +344,30 @@ class LegomenaTest(unittest.TestCase):
         after = corpus.TTR.n_types
         pd.testing.assert_series_equal(before, after)
 
+        # explicit checks
+        assert list(corpus.TTR.n_types[:9].values) == [
+            73,
+            115,
+            176,
+            215,
+            253,
+            285,
+            328,
+            359,
+            381,
+        ]
+        assert corpus.sample(9).tokens == [
+            '"',
+            "O",
+            "Tongue",
+            "a",
+            "fear",
+            "go",
+            "of",
+            "the",
+            "the",
+        ]
+
         # model fitting works
         TTR = corpus.TTR
         model = LogModel()
@@ -349,3 +376,9 @@ class LegomenaTest(unittest.TestCase):
         model.fit(TTR.m_tokens, TTR.n_types)
         after = model.params
         assert before == after
+
+    # TypeError: '<' not supported between instances of 'float' and 'str'
+    # NOTE: make sure Counter initialized by {str: int} types
+    def test_sorted_str_float_bug(self):
+        corpus = SPGC.get(3655)
+        TTR = corpus.TTR
