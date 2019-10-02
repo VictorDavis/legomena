@@ -666,7 +666,7 @@ class SPGC:
             raise e
 
         # build corpus
-        asdict = {row.word: row.freq for row in df.itertuples()}
+        asdict = {str(row.word): int(row.freq) for row in df.itertuples()}
         corpus = Corpus(asdict)
 
         # return corpus object
