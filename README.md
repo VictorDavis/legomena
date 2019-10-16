@@ -29,6 +29,7 @@ corpus = SPGC.get(2701) # moby dick
 
 # natural language toolkit
 from legomena import Corpus
+from nltk.corpus import gutenberg
 corpus = Corpus(gutenberg.words("melville-moby_dick.txt"))
 
 # basic properties
@@ -80,3 +81,7 @@ model.params
 # model predictions
 predictions = model.predict(m_tokens)
 ```
+
+## Demo App
+
+Check out the [demo app](http://legomena.herokuapp.com/) to explore the type-token and n-legomena counts of a few Project Gutenberg books.

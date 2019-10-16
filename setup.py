@@ -13,7 +13,7 @@ setup(
     py_modules=["legomena"],
     author="Victor Davis",
     author_email="vadsql@gmail.com",
-    url="http://legomena.herokuapp.com/",
+    url="https://github.com/VictorDavis/legomena",
     install_requires=["nltk", "numpy", "pandas", "scipy"],
     python_requires=">=3.5",
 )
