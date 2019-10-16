@@ -473,12 +473,6 @@ class Corpus(Counter):
             self._TTR = self._compute_TTR()
         return self._TTR.copy()
 
-    def summary(self):
-        """Print some basic information about this corpus."""
-        print("Number of tokens (<corpus>.M):", self.M)
-        print("Number of types  (<corpus>.N):", self.N)
-        print("Legomena vector  (<corpus>.k):", self.k[:9])
-
     #
     def nlegomena(self, n: int):
         """List of types occurring exactly n times in the corpus."""
@@ -654,16 +648,9 @@ class SPGC:
         # build corpus from frequency distribution
         data_path = get_data_path()
         fname = data_path / cls.fcounts / ("%s_counts.txt" % pgid)
-        try:
-            with fname.open() as f:
-                df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
-                f.close()
-        except (FileNotFoundError) as e:
-            print(
-                "File %s not found! Call SPGC.download() to download all SPGC data."
-                % fname
-            )
-            raise e
+        with fname.open() as f:
+            df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
+            f.close()
 
         # build corpus
         asdict = {str(row.word): int(row.freq) for row in df.itertuples()}
