@@ -9,3 +9,7 @@ __init__.py
 # don't commit full datafile
 *.zip
 data/SPGC-counts-2018-07-18/*
+
+# distro files
+dist/
+legomena.egg-info/
