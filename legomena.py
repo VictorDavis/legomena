@@ -474,7 +474,7 @@ class Corpus(Counter):
         return self._TTR.copy()
 
     #
-    def nlegomena(self, n: int):
+    def nlegomena(self, n: int) -> list:
         """List of types occurring exactly n times in the corpus."""
         nlegomena_ = [typ for typ, freq in self.items() if freq == n]
         return nlegomena_
