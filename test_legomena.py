@@ -5,7 +5,6 @@ nltk.download("gutenberg")
 from nltk.corpus import gutenberg
 import numpy as np
 import pandas as pd
-from pathlib import Path
 import unittest
 
 # classes to test
@@ -34,9 +33,8 @@ def RMSE_pct(y, y_hat):
 def spgc_read(fileid):
 
     # open file
-    spgc_path = Path("data/SPGC-counts-2018-07-18")
-    fname = spgc_path / fileid
-    with fname.open() as f:
+    fname = "data/SPGC-counts-2018-07-18/%s" % fileid
+    with open(fname) as f:
         df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
         f.close()
 
