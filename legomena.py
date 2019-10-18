@@ -2,20 +2,9 @@
 from collections import Counter, namedtuple
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from scipy.optimize import fsolve, curve_fit
 from scipy.special import comb as nCr
 from scipy.stats import linregress
-
-
-def get_project_root() -> Path:
-    """Returns project root folder."""
-    return Path(__file__).parent
-
-
-def get_data_path() -> Path:
-    """Returns project data folder."""
-    return get_project_root() / "data"
 
 
 class HeapsModel:
@@ -599,87 +588,3 @@ class InfSeriesModel:
 
         # return
         return n_types
-
-
-class SPGC:
-    """
-    Standard Project Gutenberg Corpus
-    ---------------------------------
-    Created by Font-Clos, F. & Gerlach, M. https://arxiv.org/abs/1812.08092
-    Snapshot downloaded from: https://zenodo.org/record/2422561/files/SPGC-counts-2018-07-18.zip
-    """
-
-    # counts file
-    fcounts = "SPGC-counts-2018-07-18"
-    fmeta = "SPGC-metadata-2018-07-18"
-    weburl = "https://zenodo.org/record/2422561"
-
-    @classmethod
-    def download(cls):
-        """
-        Downloads SPGC data from weburl
-        Extracts it into data/
-        """
-
-        # credit: https://svaderia.github.io/articles/downloading-and-unzipping-a-zipfile/
-        from io import BytesIO
-        from urllib.request import urlopen
-        from zipfile import ZipFile
-
-        zipurl = "%s/files/%s.zip" % (cls.weburl, cls.fcounts)
-        with urlopen(zipurl) as zipresp:
-            with ZipFile(BytesIO(zipresp.read())) as zfile:
-                data_path = get_data_path()
-                zfile.extractall(data_path)
-
-    @classmethod
-    def get(cls, pgid: int) -> Corpus:
-        """
-        Retrieves word frequency distribution for book by PGID
-        :param pgid: (int or str) Project Gutenberg book ID, ex get(2701) or get("PG2701")
-        :returns: Corpus, wrapper class for the "bag of words" text model
-        """
-
-        # convert int -> str
-        pgid = str(pgid)
-        if pgid[:2] != "PG":
-            pgid = "PG%s" % pgid
-
-        # build corpus from frequency distribution
-        data_path = get_data_path()
-        fname = data_path / cls.fcounts / ("%s_counts.txt" % pgid)
-        with fname.open() as f:
-            df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
-            f.close()
-
-        # build corpus
-        asdict = {str(row.word): int(row.freq) for row in df.itertuples()}
-        corpus = Corpus(asdict)
-
-        # return corpus object
-        return corpus
-
-    @classmethod
-    def metadata(cls, language: str = None) -> pd.DataFrame:
-        """
-        Retrieves metadata.csv and returns as dataframe.
-        :param language: (optional) 2-letter language code, 'en', 'fr', etc
-        """
-
-        # read csv
-        data_path = get_data_path()
-        fname = data_path / ("%s.csv" % cls.fmeta)
-        df = pd.read_csv(fname).set_index("id")
-        df = df[~df.title.isna()]
-
-        # strip out "sound" entries
-        df = df.query('type == "Text"')
-        assert df.shape == (56395, 8), "ERROR: Corrupted SPGC file %s" % fname
-
-        # filter language
-        if language is not None:
-            language = "['%s']" % language
-            df = df.query("language == @language")
-
-        # return
-        return df
