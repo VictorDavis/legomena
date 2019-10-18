@@ -5,14 +5,14 @@ nltk.download("gutenberg")
 from nltk.corpus import gutenberg
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import unittest
 
 # classes to test
-from legomena import Corpus, SPGC, HeapsModel, LogModel, InfSeriesModel
+from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel
 
 # globals
 GRAPHICS_ON = False
-PGID = 2701  # moby dick
 SEED = 42
 
 # standard error
@@ -29,6 +29,20 @@ def RMSE_pct(y, y_hat):
     # NOTE: real NRMSE formula does / ymax-ymin but in this application ymin ~= 0
     RMSE = np.sqrt(np.mean((y - y_hat) ** 2))
     return RMSE / y.max()
+
+
+def spgc_read(fileid):
+
+    # open file
+    spgc_path = Path("data/SPGC-counts-2018-07-18")
+    fname = spgc_path / fileid
+    with fname.open() as f:
+        df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
+        f.close()
+
+    # load as dictionary
+    wfd = {str(row.word): int(row.freq) for row in df.itertuples()}
+    return wfd
 
 
 # unit tests
@@ -69,63 +83,44 @@ class LegomenaTest(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             corpus.sample(x=1.5)  # can't over sample with replace=False
 
-    def test_spgc_basic(self):
-
-        # get()
-        corpus = SPGC.get(2701)
-        corpus2 = SPGC.get("PG2701")
-        assert corpus2 == corpus
-        assert corpus.M == 210258
-        assert corpus.N == 16402
-        with self.assertRaises(FileNotFoundError) as context:
-            corpus = SPGC.get(999999)
-
-        # metadata()
-        df = SPGC.metadata()
-        assert df.shape == (56395, 8)
-        df = SPGC.metadata(language="en")
-        assert df.shape == (45720, 8)
-        df = SPGC.metadata(language="xx")
-        assert df.shape == (0, 8)
-
     # compare models on SPGC and NLTK data
     def test_spgc_nltk(self):
 
         # NLTK-SPGC lookup
         books = pd.DataFrame(
             [
-                ("austen-emma.txt", "PG158"),
-                ("austen-persuasion.txt", "PG105"),
-                ("austen-sense.txt", "PG161"),
-                ("bible-kjv.txt", "PG10"),
-                ("blake-poems.txt", "PG574"),
-                ("bryant-stories.txt", "PG473"),
-                ("burgess-busterbrown.txt", "PG22816"),
-                # ("carroll-alice.txt", "PG11"),  # SPGC missing PG11_counts.txt :(
-                ("chesterton-ball.txt", "PG5265"),
-                ("chesterton-brown.txt", "PG223"),
-                ("chesterton-thursday.txt", "PG1695"),
-                ("edgeworth-parents.txt", "PG3655"),
-                ("melville-moby_dick.txt", "PG2701"),
-                ("milton-paradise.txt", "PG26"),
-                ("shakespeare-caesar.txt", "PG1120"),
-                ("shakespeare-hamlet.txt", "PG1122"),
-                ("shakespeare-macbeth.txt", "PG1129"),
-                ("whitman-leaves.txt", "PG1322"),
+                ("austen-emma.txt", "PG158_counts.txt"),
+                ("austen-persuasion.txt", "PG105_counts.txt"),
+                ("austen-sense.txt", "PG161_counts.txt"),
+                ("bible-kjv.txt", "PG10_counts.txt"),
+                ("blake-poems.txt", "PG574_counts.txt"),
+                ("bryant-stories.txt", "PG473_counts.txt"),
+                ("burgess-busterbrown.txt", "PG22816_counts.txt"),
+                # ("carroll-alice.txt", "PG11_counts.txt"),  # SPGC missing PG11 :(
+                ("chesterton-ball.txt", "PG5265_counts.txt"),
+                ("chesterton-brown.txt", "PG223_counts.txt"),
+                ("chesterton-thursday.txt", "PG1695_counts.txt"),
+                ("edgeworth-parents.txt", "PG3655_counts.txt"),
+                ("melville-moby_dick.txt", "PG2701_counts.txt"),
+                ("milton-paradise.txt", "PG26_counts.txt"),
+                ("shakespeare-caesar.txt", "PG1120_counts.txt"),
+                ("shakespeare-hamlet.txt", "PG1122_counts.txt"),
+                ("shakespeare-macbeth.txt", "PG1129_counts.txt"),
+                ("whitman-leaves.txt", "PG1322_counts.txt"),
             ],
-            columns=["fileid", "pgid"],
+            columns=["nltk_id", "spgc_id"],
         )
 
         # build corpi from each source
-        meta = SPGC.metadata()
         corpi = {}
         for book in books.itertuples():
-            title = meta.loc[book.pgid].title
-            corpus = SPGC.get(book.pgid)
-            corpi[book.pgid] = ("SPGC", title, corpus)
-            words = gutenberg.words(book.fileid)
+            title = book.nltk_id.split(".")[0]
+            wfd = spgc_read(book.spgc_id)
+            corpus = Corpus(wfd)
+            corpi[book.spgc_id] = ("SPGC", title, corpus)
+            words = gutenberg.words(book.nltk_id)
             corpus = Corpus(words)
-            corpi[book.fileid] = ("NLTK", title, corpus)
+            corpi[book.nltk_id] = ("NLTK", title, corpus)
 
         # fit TTR curve for all & compare RMSE
         results = []
@@ -192,7 +187,8 @@ class LegomenaTest(unittest.TestCase):
     def test_models(self):
 
         # initialize class
-        corpus = SPGC.get(PGID)
+        wfd = spgc_read("PG2701_counts.txt")  # moby dick
+        corpus = Corpus(wfd)
 
         # build TTR curve
         corpus.seed = SEED
@@ -266,7 +262,7 @@ class LegomenaTest(unittest.TestCase):
         # TODO: Why SPGC model quality suffers relative to NLTK ?
 
         # initialize class
-        corpus = Corpus(words)  # SPGC.get(PGID)
+        corpus = Corpus(words)
         corpus.dimension = 5
         corpus.seed = SEED
         TTR = corpus.TTR
@@ -376,9 +372,3 @@ class LegomenaTest(unittest.TestCase):
         model.fit(TTR.m_tokens, TTR.n_types)
         after = model.params
         assert before == after
-
-    # TypeError: '<' not supported between instances of 'float' and 'str'
-    # NOTE: make sure Counter initialized by {str: int} types
-    def test_sorted_str_float_bug(self):
-        corpus = SPGC.get(3655)
-        TTR = corpus.TTR
