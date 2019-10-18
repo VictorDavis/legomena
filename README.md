@@ -10,12 +10,26 @@ pip install legomena
 
 ## Data Sources
 
-This package is driven by two data sources: the [Natural Language ToolKit](https://www.nltk.org/) and/or the [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092). The former being the gold standard of python NLP applications, but having a rather weak 16-book gutenberg corpus. The latter containing the full 40,000+ book gutenberg corpus, already tokenized and counted. NOTE: The overlap of the two datasets do _not_ agree in their exact type/token counts, their methodology differing, but this package takes type/token counts as raw data and is therefore methodology-agnostic.
+This package may be driven by any data source, but the author has tested two: the [Natural Language ToolKit](https://www.nltk.org/) and/or the [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092). The former being the gold standard of python NLP applications, but having a rather weak 16-book gutenberg corpus. The latter containing the full 40,000+ book gutenberg corpus, already tokenized and counted. NOTE: The overlap of the two datasets do _not_ agree in their exact type/token counts, their methodology differing, but this package takes type/token counts as raw data and is therefore methodology-agnostic.
 
-To download either data source from a python console:
 ```
+# moby dick from NLTK
+import nltk
 nltk.download("gutenberg")
-SPGC.download()
+from nltk.corpus import gutenberg
+words = gutenberg.words("melville-moby_dick")
+corpus = Corpus(words)
+assert corpus.M, corpus.N == (260819, 19317)
+
+# moby dick from SPGC
+# NOTE: download and unzip https://zenodo.org/record/2422561/files/SPGC-counts-2018-07-18.zip into DATA_FOLDER
+fname = "%s/SPGC-counts-2018-07-18/PG2701_counts.txt" % DATA_FOLDER
+with open(fname) as f:
+    df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
+    f.close()
+wfd = {str(row.word): int(row.freq) for row in df.itertuples()}
+corpus = Corpus(wfd)
+assert corpus.M, corpus.N == (210258, 16402)
 ```
 
 ## Basic Usage:
@@ -23,15 +37,6 @@ SPGC.download()
 Demo notebooks may be found [here](https://github.com/VictorDavis/legomena/tree/master/notebooks). Unit tests may be found [here](https://github.com/VictorDavis/legomena/blob/master/test_legomena.py).
 
 ```
-# standard project gutenberg corpus
-from legomena import SPGC
-corpus = SPGC.get(2701) # moby dick
-
-# natural language toolkit
-from legomena import Corpus
-from nltk.corpus import gutenberg
-corpus = Corpus(gutenberg.words("melville-moby_dick.txt"))
-
 # basic properties
 corpus.tokens  # list of tokens
 corpus.types  # list of types
@@ -67,7 +72,7 @@ There are a variety of models in the literature predicting number of types as a 
 # three models
 model = HeapsModel()  # Heap's Law
 model = InfSeriesModel(corpus)  # Infinite Series Model [1]
-model = LogModel(corpus)  # Logarithmic Model [1]
+model = LogModel()  # Logarithmic Model [1]
 
 # model fitting
 m_tokens = corpus.TTR.m_tokens
