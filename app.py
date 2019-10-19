@@ -9,13 +9,27 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # internal dependencies
-from legomena import SPGC, Corpus, HeapsModel, InfSeriesModel, LogModel
+from legomena import Corpus, HeapsModel, InfSeriesModel, LogModel
 
 # model comparison over all books, created by test_spgc_nltk()
 books = pd.read_csv("data/books.csv", index_col=0)
 
 # use random seed to ensure cross-figure consistency
 SEED = 42
+
+
+def spgc_read(fileid):
+
+    # open file
+    fname = "data/SPGC-counts-2018-07-18/%s" % fileid
+    with open(fname) as f:
+        df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
+        f.close()
+
+    # load as dictionary
+    wfd = {str(row.word): int(row.freq) for row in df.itertuples()}
+    return wfd
+
 
 # available sources
 def sources():
@@ -79,7 +93,8 @@ def plotTTR(source, fileid):
         words = gutenberg.words(fileid)
         corpus = Corpus(words)
     else:
-        corpus = SPGC.get(fileid)
+        wfd = spgc_read(fileid)
+        corpus = Corpus(wfd)
 
     # type-token ratio data
     corpus.seed = SEED
@@ -162,7 +177,8 @@ def plotLego(source, fileid):
         words = gutenberg.words(fileid)
         corpus = Corpus(words)
     else:
-        corpus = SPGC.get(fileid)
+        wfd = spgc_read(fileid)
+        corpus = Corpus(wfd)
 
     # type-token ratio data
     corpus.seed = SEED
