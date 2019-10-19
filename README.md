@@ -2,7 +2,7 @@
 
 Tool for exploring types, tokens, and n-legomena relationships in text. Based on [Davis 2019](https://arxiv.org/pdf/1901.00521.pdf) [1] research paper.
 
-[![Testing Status](https://github.com/VictorDavis/legomena/workflows/main/badge.svg)](https://github.com/VictorDavis/legomena/actions)
+[![Testing Status](https://github.com/VictorDavis/legomena/workflows/tests/badge.svg)](https://github.com/VictorDavis/legomena/actions)
 
 ## Installation
 
