@@ -1,4 +1,4 @@
-name: Python package
+name: main
 
 on:
   push:
@@ -9,8 +9,6 @@ on:
 
 jobs:
   build:
-
-    name: main
 
     runs-on: ubuntu-latest
     strategy:
