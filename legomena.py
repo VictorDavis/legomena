@@ -161,6 +161,50 @@ class LogModel:
         dim = dim_
         self.options = (eps, dim)
 
+    def formula_0(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        denom = x - 1
+        k0 = (x - logx * x - 1) / denom
+        return k0
+
+    def formula_1(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        x2 = x ** 2
+        denom = (x - 1) ** 2
+        k1 = (x2 - logx * x - x) / denom
+        return k1
+
+    def formula_2(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        x2, x3 = x ** 2, x ** 3
+        denom = 2 * (x - 1) ** 3
+        k2 = (x3 - 2 * logx * x2 - x) / denom
+        return k2
+
+    def formula_3(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        x2, x3, x4 = x ** 2, x ** 3, x ** 4
+        denom = 6 * (x - 1) ** 4
+        k3 = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / denom
+        return k3
+
+    def formula_4(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        x2, x3, x4, x5 = x ** 2, x ** 3, x ** 4, x ** 5
+        denom = 12 * (x - 1) ** 5
+        k4 = (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x) / denom
+        return k4
+
+    def formula_5(self, x: np.ndarray) -> np.ndarray:
+        logx = np.log(x)
+        x2, x3, x4, x5, x6 = x ** 2, x ** 3, x ** 4, x ** 5, x ** 6
+        k5 = (
+            (12 * x6 - 60 * logx * x5 + 65 * x5 - 120 * x4 + 60 * x3 - 20 * x2 + 3 * x)
+            / 60
+            / (x - 1) ** 6
+        )
+        return k5
+
     def formula(self, x: np.ndarray) -> np.ndarray:
         """
         Predicts normalized k-vector for given proportion of tokens.
@@ -186,22 +230,18 @@ class LogModel:
 
         # initialize results
         k_frac = np.zeros((len(x), dim))
-        logx = np.log(x)
-        x2, x3, x4, x5, x6 = [x ** i for i in range(2, dim + 1)]
-        k_frac[:, 0] = (x - logx * x - 1) / (x - 1)
-        k_frac[:, 1] = (x2 - logx * x - x) / (x - 1) ** 2
-        k_frac[:, 2] = (x3 - 2 * logx * x2 - x) / 2 / (x - 1) ** 3
-        k_frac[:, 3] = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / 6 / (x - 1) ** 4
-        k_frac[:, 4] = (
-            (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x)
-            / 12
-            / (x - 1) ** 5
-        )
-        k_frac[:, 5] = (
-            (12 * x6 - 60 * logx * x5 + 65 * x5 - 120 * x4 + 60 * x3 - 20 * x2 + 3 * x)
-            / 60
-            / (x - 1) ** 6
-        )
+        if dim >= 1:
+            k_frac[:, 0] = self.formula_0(x)
+        if dim >= 2:
+            k_frac[:, 1] = self.formula_1(x)
+        if dim >= 3:
+            k_frac[:, 2] = self.formula_2(x)
+        if dim >= 4:
+            k_frac[:, 3] = self.formula_3(x)
+        if dim >= 5:
+            k_frac[:, 4] = self.formula_4(x)
+        if dim >= 6:
+            k_frac[:, 5] = self.formula_5(x)
 
         # limiting values @ x=0 & x=1
         _k_frac[x_iszero, :] = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
