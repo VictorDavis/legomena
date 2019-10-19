@@ -12,19 +12,20 @@ pip install legomena
 
 ## Data Sources
 
-This package may be driven by any data source, but the author has tested two: the [Natural Language ToolKit](https://www.nltk.org/) and/or the [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092). The former being the gold standard of python NLP applications, but having a rather weak 16-book gutenberg corpus. The latter containing the full 40,000+ book gutenberg corpus, already tokenized and counted. NOTE: The overlap of the two datasets do _not_ agree in their exact type/token counts, their methodology differing, but this package takes type/token counts as raw data and is therefore methodology-agnostic.
+This package may be driven by any data source, but the author has tested two: the [Natural Language ToolKit](https://www.nltk.org/) and the [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092). The former being the gold standard of python NLP applications, but having a rather measly 18-book gutenberg corpus. The latter containing the full 55,000+ book gutenberg corpus, already tokenized and counted. NOTE: The overlap of the two datasets do _not_ agree in their exact type/token counts, their methodology differing, but this package takes type/token counts as raw data and is therefore methodology-agnostic.
 
 ```
 # moby dick from NLTK
 import nltk
 nltk.download("gutenberg")
 from nltk.corpus import gutenberg
-words = gutenberg.words("melville-moby_dick")
+words = gutenberg.words("melville-moby_dick.txt")
 corpus = Corpus(words)
 assert corpus.M, corpus.N == (260819, 19317)
 
 # moby dick from SPGC
 # NOTE: download and unzip https://zenodo.org/record/2422561/files/SPGC-counts-2018-07-18.zip into DATA_FOLDER
+import pandas as pd
 fname = "%s/SPGC-counts-2018-07-18/PG2701_counts.txt" % DATA_FOLDER
 with open(fname) as f:
     df = pd.read_csv(f, delimiter="\t", header=None, names=["word", "freq"])
@@ -47,16 +48,17 @@ corpus.WFD  # alias for corpus.fdist
 corpus.M  # number of tokens
 corpus.N  # number of types
 corpus.k  # n-legomena vector
-corpus.hapax  # number of hapax legomena, alias for corpus.nlegomena(1)
-corpus.dis  # number of dis legomena, alias for corpus.nlegomena(2)
-corpus.tris  # number of tris legomena, alias for corpus.nlegomena(3)
-corpus.tetrakis  # number of tetrakis legomena, alias for corpus.nlegomena(4)
-corpus.pentakis  # number of pentakis legomena, alias for corpus.nlegomena(5)
+corpus.k[n]  # n-legomena count (n=1 -> number of hapaxes)
+corpus.hapax  # list of hapax legomena, alias for corpus.nlegomena(1)
+corpus.dis  # list of dis legomena, alias for corpus.nlegomena(2)
+corpus.tris  # list of tris legomena, alias for corpus.nlegomena(3)
+corpus.tetrakis  # list of tetrakis legomena, alias for corpus.nlegomena(4)
+corpus.pentakis  # list of pentakis legomena, alias for corpus.nlegomena(5)
 
 # advanced properties
 corpus.options  # tuple of optional settings
-corpus.resolution  # number of samples when calculating TTR curve
-corpus.dimension  # n-legomena vector length to pre-compute
+corpus.resolution  # number of samples to take to calculate TTR curve
+corpus.dimension  # n-legomena vector length to pre-compute (max 6)
 corpus.seed  # random number seed for sampling TTR data
 corpus.TTR  # type-token ratio dataframe
 
@@ -87,6 +89,9 @@ model.params
 
 # model predictions
 predictions = model.predict(m_tokens)
+
+# log model only
+predicted_k = model.predict_k(m_tokens)
 ```
 
 ## Demo App

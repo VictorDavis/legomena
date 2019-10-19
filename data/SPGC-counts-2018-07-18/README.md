@@ -2,13 +2,26 @@
 
 This folder contains a 17-book sub-selection of the much larger [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092) created by Font-Clos, F. & Gerlach, M. These are the minimum number of books to run the unit tests for this package, and also corresponds to NLTK's gutenberg corpus, as documented below.
 
-Download the full 55,000-book 2018-07-18 wordcount snapshot from [Zenodo](https://zenodo.org/record/2422561/files/SPGC-counts-2018-07-18.zip).
+Download the full 55,000-book 'frozen' version of the corpus (SPGC-2018-07-18) as a Zenodo dataset:
 
-It is _not_ necessary to unzip this file in order to use this package. The `SPGC.get(<pgid>)` function will work the same whether `data/SPGC-counts-2018-07-18.zip` exists or `data/SPGC-counts-2018-07-18/PG<pgid>_counts.txt` exists. Therefore, it is _recommended_ that you download this 1.5GB wordcount zipfile before using, adapting, or customizing this code, but not strictly necessary.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2422560.svg)](https://doi.org/10.5281/zenodo.2422560)
 
 ## SPGC vs NLTK
 
-The Standard Project Gutenberg Corpus (SPGC) contains a snapshot of _all_ books in the Project Gutenberg library. To download the latest snapshot, check out this repo: https://github.com/pgcorpus/gutenberg. The Natural Language ToolKit (NLTK) sadly only contains 18 books. Here is a lookup reference for the Project Gutenberg IDs of each book in the `nltk.gutenberg` corpus. Because of different preprocessing decisions, the word counts won't be identical between the two sources. For some reason, PG#11, _Alice in Wonderland_, is missing from the SPGC zipfile. Curiouser and curiouser!
+The [Natural Language ToolKit](https://www.nltk.org/) is the gold standard of NLP for python. Unfortunately, it contains a rather measly 18-book corpus from [Project Gutenberg](https://www.gutenberg.org/), a rather pathetic sample size for any robust NLP claims.
+
+The [Standard Project Gutenberg Corpus](https://arxiv.org/abs/1812.08092), created by Font-Clos, F. & Gerlach, M. in 2018, consists of two parts:
+
+- [PGCorpus](https://github.com/pgcorpus/gutenberg): a tool for downloading and tokenizing the entire 55,000-book corpus available from [Project Gutenberg](https://www.gutenberg.org/) at any given time.
+- [SPGC-2018-07-18](https://doi.org/10.5281/zenodo.2422560): a 'frozen' version of the corpus as it existed at the time of the tool's creation.
+
+Either of these tools may be used to obtain word frequency distributions for _any_ book on [Project Gutenberg](https://www.gutenberg.org/) for NLP research. Because text tokenization is a non-trivial task involving a myriad of preprocessing microdecisions, any researcher potentially introduces bias into her research by attempting to "roll her own" string tokenizer. Therefore, outsourcing this piece to a neutral third party has three benefits:
+
+- **Reproduceability**: Identical word frequency data may be obtained by author and reviewer from a third party.
+- **Objectivity**: Preprocessing microdecisions are made by a third party, so the author can't "fine tune" them (consciously or unconsciously) to a particular hypothesis.
+- **Robustness**: (SPGC only) Hypotheses may be tested against a 55,000+ book sample.
+
+Here is a lookup reference for the Project Gutenberg IDs of each book in the `nltk.gutenberg` corpus. Because of differing preprocessing microdecisions, the word counts won't be identical between the two sources. Also, PG#11, _Alice in Wonderland_, is missing from SPGC-2018-07-18 for some reason. Curiouser and curiouser!
 
 ```
     ("austen-emma.txt", 158),
