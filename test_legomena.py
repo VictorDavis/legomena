@@ -370,3 +370,35 @@ class LegomenaTest(unittest.TestCase):
         model.fit(TTR.m_tokens, TTR.n_types)
         after = model.params
         assert before == after
+
+    # generalized formula matches explicit formula
+    def test_generalized(self):
+
+        # apply both formulas to random selection of x values
+        model = LogModel()
+        np.random.seed(SEED)
+        x = 2 * np.random.rand(99)
+
+        # explicit formulas
+        k0 = model.formula_0(x)
+        k1 = model.formula_1(x)
+        k2 = model.formula_2(x)
+        k3 = model.formula_3(x)
+        k4 = model.formula_4(x)
+        k5 = model.formula_5(x)
+
+        # generalized formula
+        kn0 = model.formula_n(0, x)
+        kn1 = model.formula_n(1, x)
+        kn2 = model.formula_n(2, x)
+        kn3 = model.formula_n(3, x)
+        kn4 = model.formula_n(4, x)
+        kn5 = model.formula_n(5, x)
+
+        # all "close"
+        assert RMSE_pct(k0, kn0) < 1e-15
+        assert RMSE_pct(k1, kn1) < 1e-12
+        assert RMSE_pct(k2, kn2) < 1e-10
+        assert RMSE_pct(k3, kn3) < 1e-08
+        assert RMSE_pct(k4, kn4) < 1e-05
+        assert RMSE_pct(k5, kn5) < 1e-03
