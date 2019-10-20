@@ -1,5 +1,6 @@
 # bloody dependencies
 from collections import Counter, namedtuple
+from mpmath import lerchphi
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
@@ -161,41 +162,77 @@ class LogModel:
         dim = dim_
         self.options = (eps, dim)
 
-    def formula_0(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_0(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of types *not* sampled in proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.0 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         denom = x - 1
         k0 = (x - logx * x - 1) / denom
         return k0
 
-    def formula_1(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_1(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of hapax legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.1 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         x2 = x ** 2
         denom = (x - 1) ** 2
         k1 = (x2 - logx * x - x) / denom
         return k1
 
-    def formula_2(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_2(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of dis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.2 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         x2, x3 = x ** 2, x ** 3
         denom = 2 * (x - 1) ** 3
         k2 = (x3 - 2 * logx * x2 - x) / denom
         return k2
 
-    def formula_3(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_3(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of tris legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.3 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         x2, x3, x4 = x ** 2, x ** 3, x ** 4
         denom = 6 * (x - 1) ** 4
         k3 = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / denom
         return k3
 
-    def formula_4(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_4(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of tetrakis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.4 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         x2, x3, x4, x5 = x ** 2, x ** 3, x ** 4, x ** 5
         denom = 12 * (x - 1) ** 5
         k4 = (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x) / denom
         return k4
 
-    def formula_5(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_5(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of pentakis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.5 in https://arxiv.org/pdf/1901.00521.pdf
+        """
         logx = np.log(x)
         x2, x3, x4, x5, x6 = x ** 2, x ** 3, x ** 4, x ** 5, x ** 6
         k5 = (
@@ -204,6 +241,29 @@ class LogModel:
             / (x - 1) ** 6
         )
         return k5
+
+    @staticmethod
+    def formula_n(n: int, x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of n-legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Unpublished generalization of eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
+        """
+
+        # mpmath.lerchphi is not vectorized
+        def _lerchphi(zvec: np.ndarray, s: float, a: float) -> np.ndarray:
+            val = [lerchphi(z, s, a) for z in zvec]
+            val = np.array([float(v.real) for v in val])
+            return val
+
+        # special case @n=0
+        if n == 0:
+            kn = 1 - _lerchphi((x - 1) / x, 1, n + 1)
+        else:
+            kn = x / (x - 1) / n - _lerchphi((x - 1) / x, 1, n) / (x - 1)
+
+        # return
+        return kn
 
     def formula(self, x: np.ndarray) -> np.ndarray:
         """
@@ -230,24 +290,31 @@ class LogModel:
 
         # initialize results
         k_frac = np.zeros((len(x), dim))
-        if dim >= 1:
-            k_frac[:, 0] = self.formula_0(x)
-        if dim >= 2:
-            k_frac[:, 1] = self.formula_1(x)
-        if dim >= 3:
-            k_frac[:, 2] = self.formula_2(x)
-        if dim >= 4:
-            k_frac[:, 3] = self.formula_3(x)
-        if dim >= 5:
-            k_frac[:, 4] = self.formula_4(x)
-        if dim >= 6:
-            k_frac[:, 5] = self.formula_5(x)
+        for n in range(dim):
+            if n == 0:
+                k_frac[:, 0] = self.formula_0(x)
+            elif n == 1:
+                k_frac[:, 1] = self.formula_1(x)
+            elif n == 2:
+                k_frac[:, 2] = self.formula_2(x)
+            elif n == 3:
+                k_frac[:, 3] = self.formula_3(x)
+            elif n == 4:
+                k_frac[:, 4] = self.formula_4(x)
+            elif n == 5:
+                k_frac[:, 5] = self.formula_5(x)
+            else:
+                k_frac[:, n] = self.formula_n(n, x)
 
         # limiting values @ x=0 & x=1
-        _k_frac[x_iszero, :] = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        _k_frac[x_isone, :] = np.array(
-            [0.0, 1.0 / 2, 1.0 / 6, 1.0 / 12, 1.0 / 20, 1.0 / 30]
-        )
+        if dim >= 1:
+            _k_frac[x_iszero, 0] = 1.0
+            _k_frac[x_isone, 0] = 0.0
+            if dim > 1:
+                _k_frac[x_iszero, 1:] = 0.0
+                _k_frac[x_isone, 1:] = (
+                    1.0 / np.arange(1, dim) / (1 / np.arange(2, dim + 1))
+                )
         _k_frac[x_isokay] = k_frac
 
         # return proportions
