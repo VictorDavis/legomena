@@ -11,12 +11,12 @@ import unittest
 from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel
 
 # globals
-GRAPHICS_ON = False
+GRAPHICS_ON = True
 SEED = 42
 
 # standard error
-def std_err(y: float, y_hat: float):
-    return abs(y_hat - y) / y
+def std_err(y, y_hat):
+    return np.abs(y_hat - y) / y
 
 
 # root mean squared error as a percent of total types (normalized)
@@ -261,7 +261,8 @@ class LegomenaTest(unittest.TestCase):
 
         # initialize class
         corpus = Corpus(words)
-        corpus.dimension = 5
+        dim = 6
+        corpus.dimension = dim
         corpus.seed = SEED
         TTR = corpus.TTR
 
@@ -272,7 +273,7 @@ class LegomenaTest(unittest.TestCase):
 
         # generate single prediction
         E_m = model.predict(corpus.M)
-        k = model.predict_k(corpus.M)
+        k = model.predict_k(corpus.M, dim)
         assert std_err(corpus.N, E_m) < 0.0001
         assert std_err(corpus.k[1], k[1]) < 0.001
         assert std_err(corpus.k[2], k[2]) < 0.005
@@ -302,7 +303,7 @@ class LegomenaTest(unittest.TestCase):
             plt.show()
 
             # predicted hapax fraction
-            k = model.predict_k(m_tokens)
+            k = model.predict_k(m_tokens, dim)
             predictions = k[:, 1] / E_m
             realization = TTR.lego_1 / n_types
             plt.scatter(m_tokens, realization)
@@ -485,3 +486,43 @@ class LegomenaTest(unittest.TestCase):
         assert model.formula_n(3, x)[0] == k3_
         assert model.formula_n(4, x)[0] == k4_
         assert model.formula_n(5, x)[0] == k5_
+
+    # check model k_n predictions for n > 5
+    def test_high_dimensions(self):
+
+        # retrieve corpus from NLTK
+        filename = "melville-moby_dick.txt"
+        words = gutenberg.words(filename)
+
+        # initialize class
+        corpus = Corpus(words)
+        dim = 64
+        corpus.dimension = dim
+        corpus.seed = SEED
+        TTR = corpus.TTR
+
+        # k vector calculated correctly
+        raw = corpus.k[:dim]
+        agg = TTR.tail(1).values[0, 2:]
+        assert all(agg == raw)
+
+        # create & fit model
+        m_tokens, n_types = TTR.m_tokens, TTR.n_types
+        model = LogModel().fit(m_tokens, n_types)
+
+        # predict E(M) & k_n(M)
+        model.dimension = dim
+        E_m = model.predict(corpus.M)
+        k = model.predict_k(corpus.M, dim)
+        assert len(k) == dim
+        err = std_err(corpus.k[:dim], k)
+
+        # visualize error
+        if GRAPHICS_ON:
+            import matplotlib.pyplot as plt
+
+            plt.plot(err)
+            plt.title("Error Analysis")
+            plt.xlabel("n = k-vector index")
+            plt.ylabel("std error")
+            plt.show()
