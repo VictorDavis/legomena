@@ -402,3 +402,86 @@ class LegomenaTest(unittest.TestCase):
         assert RMSE_pct(k3, kn3) < 1e-08
         assert RMSE_pct(k4, kn4) < 1e-05
         assert RMSE_pct(k5, kn5) < 1e-03
+
+    # generalized formula contains no singularities
+    def test_singularities(self):
+
+        # singularity @ x=0
+        model = LogModel()
+
+        # explicit formula singularity @x=0
+        x = np.array([0.0])
+        assert np.isnan(model.formula_0(x)[0])
+        assert np.isnan(model.formula_1(x)[0])
+        assert np.isnan(model.formula_2(x)[0])
+        assert np.isnan(model.formula_3(x)[0])
+        assert np.isnan(model.formula_4(x)[0])
+        assert np.isnan(model.formula_5(x)[0])
+
+        # generalized formula returns correct answer
+        assert model.formula_n(0, x)[0] == 1.0
+        assert model.formula_n(1, x)[0] == 0.0
+        assert model.formula_n(2, x)[0] == 0.0
+        assert model.formula_n(3, x)[0] == 0.0
+        assert model.formula_n(4, x)[0] == 0.0
+        assert model.formula_n(5, x)[0] == 0.0
+
+        # singularity @ x=1
+        eps = 1e-6
+        x = np.array([1 - eps, 1 + eps])
+
+        # limiting values as eps -> 0, x -> 1
+        k0_ = 0.0
+        k1_ = 1 / 1 - 1 / 2  # 1/2
+        k2_ = 1 / 2 - 1 / 3  # 1/6
+        k3_ = 1 / 3 - 1 / 4  # 1/12
+        k4_ = 1 / 4 - 1 / 5  # 1/20
+        k5_ = 1 / 5 - 1 / 6  # 1/30
+
+        # explicit formulas
+        explicit_delta0 = abs(model.formula_0(x) - k0_)
+        explicit_delta1 = abs(model.formula_1(x) - k1_)
+        explicit_delta2 = abs(model.formula_2(x) - k2_)
+        explicit_delta3 = abs(model.formula_3(x) - k3_)
+        explicit_delta4 = abs(model.formula_4(x) - k4_)
+        explicit_delta5 = abs(model.formula_5(x) - k5_)
+
+        # generalized formula
+        generalized_delta0 = abs(model.formula_n(0, x) - k0_)
+        generalized_delta1 = abs(model.formula_n(1, x) - k1_)
+        generalized_delta2 = abs(model.formula_n(2, x) - k2_)
+        generalized_delta3 = abs(model.formula_n(3, x) - k3_)
+        generalized_delta4 = abs(model.formula_n(4, x) - k4_)
+        generalized_delta5 = abs(model.formula_n(5, x) - k5_)
+
+        # explicit formula diverges from limiting value
+        assert all(explicit_delta1 > eps)
+        assert all(explicit_delta2 > eps * 1e5)
+        assert all(explicit_delta3 > eps * 1e13)
+        assert all(explicit_delta4 > eps * 1e18)
+        assert all(explicit_delta5 > eps * 1e25)
+
+        # generalized formula tends toward limiting value
+        assert all(generalized_delta0 < eps)
+        assert all(generalized_delta1 < eps)
+        assert all(generalized_delta2 < eps)
+        assert all(generalized_delta3 < eps)
+        assert all(generalized_delta4 < eps)
+        assert all(generalized_delta5 < eps)
+
+        # explicit formula singularity @x=1
+        x = np.array([1.0])
+        assert np.isnan(model.formula_0(x)[0])
+        assert np.isnan(model.formula_1(x)[0])
+        assert np.isnan(model.formula_2(x)[0])
+        assert np.isnan(model.formula_3(x)[0])
+        assert np.isnan(model.formula_4(x)[0])
+        assert np.isnan(model.formula_5(x)[0])
+
+        # generalized formula returns correct answer
+        assert model.formula_n(0, x)[0] == k0_
+        assert model.formula_n(1, x)[0] == k1_
+        assert model.formula_n(2, x)[0] == k2_
+        assert model.formula_n(3, x)[0] == k3_
+        assert model.formula_n(4, x)[0] == k4_
+        assert model.formula_n(5, x)[0] == k5_
