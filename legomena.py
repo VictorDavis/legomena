@@ -255,7 +255,7 @@ class LogModel:
         vlerchphi = np.vectorize(_lerchphi)
         vzlerchphi = np.vectorize(_zlerchphi)
 
-        # express x as z = x/(1-x)
+        # express x as z = x/(x-1)
         z = x / (x - 1)
 
         # special case @n=0
