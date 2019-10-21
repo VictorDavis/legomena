@@ -100,12 +100,6 @@ class LogModel:
     LogParams = namedtuple("LogParams", ("M_z", "N_z"))
     _params = None
 
-    # user options
-    UserOptions = namedtuple("UserOptions", ("dimension",))
-    _options = UserOptions(
-        dimension=6  # max value of n returned for n-legomena count prediction
-    )
-
     @property
     def params(self) -> tuple:  # LogParams
         assert (
@@ -126,29 +120,6 @@ class LogModel:
     def N_z(self) -> int:
         """The number of types in this corpus's optimum sample."""
         return self.params.N_z
-
-    @property
-    def options(self) -> tuple:  # UserOptions
-        """Misc low-impact options when evaluating the log formula."""
-        return self._options
-
-    @options.setter
-    def options(self, opt_: tuple):
-        opt_ = self.UserOptions(*opt_)
-        dim = opt_.dim
-        assert dim <= 6, "Cannot predict n-legomena counts for n > 6 at this time."
-        self._options = opt_
-
-    @property
-    def dimension(self) -> int:
-        """Max value of n returned for n-legomena count prediction."""
-        return self.options.dimension
-
-    @dimension.setter
-    def dimension(self, dim_: int):
-        dim = self.options
-        dim = dim_
-        self.options = (dim,)
 
     @staticmethod
     def formula_0(x: np.ndarray) -> np.ndarray:
@@ -296,19 +267,17 @@ class LogModel:
         # return
         return kn
 
-    def formula(self, x: np.ndarray) -> np.ndarray:
+    def formula(self, x: np.ndarray, dim: int) -> np.ndarray:
         """
         Predicts normalized k-vector for given proportion of tokens.
         NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
         :param x: List-like independent variable x, the proportion of tokens
+        :param dim: Desired dimension for returned vector
         :returns k_frac: Expected proportions of n-legomena for n = 0 to dim
         """
 
         # coerce into dimensionless array
         x = np.array(x).reshape(-1)
-
-        # desired size of k-vector
-        dim = self.options.dimension
 
         # apply kn formula to each value of n
         k_frac = np.array([self.formula_n(n, x) for n in range(dim)])
@@ -376,7 +345,7 @@ class LogModel:
         m_tokens = np.array(m_tokens).reshape(-1)
 
         # redirect: E(m) = N_z - k_0(m)
-        k = self.predict_k(m_tokens, nearest_int=nearest_int)
+        k = self.predict_k(m_tokens, dim=1, nearest_int=nearest_int)
         n_types = self.N_z - k[:, 0]
 
         # allow scalar
@@ -388,14 +357,19 @@ class LogModel:
         return n_types
 
     def predict_k(
-        self, m_tokens: np.ndarray, normalize: bool = False, nearest_int: bool = True
+        self,
+        m_tokens: np.ndarray,
+        dim: int,
+        normalize: bool = False,
+        nearest_int: bool = True,
     ) -> np.ndarray:
         """
         Applies the log formula to model the k-vector as a function of tokens.
         :param m_tokens: Number of tokens (scalar or list-like)
+        :param dim: (int) Desired dimension of vector k
         :param normalize: (bool, False) Return proportions instead of counts
         :param nearest_int: (bool, True) Round predictions to the nearest integer
-        :returns k: Predicted n-legomena counts for n = 0 to 5
+        :returns k: Predicted n-legomena counts for n = 0 to dim-1
         """
 
         # allow scalar
@@ -407,7 +381,7 @@ class LogModel:
 
         # scale down to normalized log formula
         x = m_tokens / M_z
-        k_frac = self.formula(x)
+        k_frac = self.formula(x, dim)
 
         # normalize, or don't
         if normalize:
@@ -539,7 +513,7 @@ class Corpus(Counter):
 
     @property
     def dimension(self) -> int:
-        """The desired dimension of the problem, highest n for which n-legomena counts are included in TTR."""
+        """The desired dimension of the problem, include n-legomena counts for n = 0 to dim-1."""
         return self.options.dimension
 
     @dimension.setter
