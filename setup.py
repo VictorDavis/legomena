@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="legomena",
-    version="1.1.0",
+    version="1.2.0",
     description="Tool for exploring types, tokens, and n-legomena relationships in text.",
     license="MIT",
     long_description=long_description,
@@ -14,6 +14,6 @@ setup(
     author="Victor Davis",
     author_email="vadsql@gmail.com",
     url="https://github.com/VictorDavis/legomena",
-    install_requires=["nltk", "numpy", "pandas", "scipy"],
+    install_requires=["mpmath", "nltk", "numpy", "pandas", "scipy"],
     python_requires=">=3.5",
 )

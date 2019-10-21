@@ -1,5 +1,6 @@
 # bloody dependencies
 from collections import Counter, namedtuple
+from mpmath import lerchphi
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
@@ -99,13 +100,6 @@ class LogModel:
     LogParams = namedtuple("LogParams", ("M_z", "N_z"))
     _params = None
 
-    # user options
-    UserOptions = namedtuple("UserOptions", ("epsilon", "dimension"))
-    _options = UserOptions(
-        epsilon=1e-3,  # distance to singularity to return limiting value
-        dimension=6,  # max value of n returned for n-legomena count prediction
-    )
-
     @property
     def params(self) -> tuple:  # LogParams
         assert (
@@ -127,91 +121,170 @@ class LogModel:
         """The number of types in this corpus's optimum sample."""
         return self.params.N_z
 
-    @property
-    def options(self) -> tuple:  # UserOptions
-        """Misc low-impact options when evaluating the log formula."""
-        return self._options
-
-    @options.setter
-    def options(self, opt_: tuple):
-        opt_ = self.UserOptions(*opt_)
-        dim = opt_.dim
-        assert dim <= 6, "Cannot predict n-legomena counts for n > 6 at this time."
-        self._options = opt_
-
-    @property
-    def epsilon(self) -> float:
-        """Distance to singularity to return limiting value."""
-        return self.options.epsilon
-
-    @epsilon.setter
-    def epsilon(self, eps_: int):
-        eps, dim = self.options
-        eps = eps_
-        self.options = (eps, dim)
-
-    @property
-    def dimension(self) -> int:
-        """Max value of n returned for n-legomena count prediction."""
-        return self.options.dimension
-
-    @dimension.setter
-    def dimension(self, dim_: int):
-        eps, dim = self.options
-        dim = dim_
-        self.options = (eps, dim)
-
-    def formula(self, x: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def formula_0(x: np.ndarray) -> np.ndarray:
         """
-        Predicts normalized k-vector for given proportion of tokens.
-        NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
-        :param x: List-like independent variable x, the proportion of tokens
-        :returns k_frac: Expected proportions of n-legomena for n = 0 to dim
+        Predicted number of types *not* sampled in proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.0 in https://arxiv.org/pdf/1901.00521.pdf
         """
-
-        x = np.array(x).reshape(-1)
-
-        # TODO: implement generalized formula
-        epsilon = self.options.epsilon
-        dim = self.options.dimension
-
-        # initialize return vectors
-        _k_frac = np.zeros((len(x), dim))
-
-        # two singularities @ x=0 & x=1
-        x_iszero = np.abs(x) < epsilon  # singularity @ x=0
-        x_isone = np.abs(x - 1.0) < epsilon  # singularity @ x=1
-        x_isokay = ~np.logical_or(x_iszero, x_isone)
-        x = x[x_isokay]
-
-        # initialize results
-        k_frac = np.zeros((len(x), dim))
         logx = np.log(x)
-        x2, x3, x4, x5, x6 = [x ** i for i in range(2, dim + 1)]
-        k_frac[:, 0] = (x - logx * x - 1) / (x - 1)
-        k_frac[:, 1] = (x2 - logx * x - x) / (x - 1) ** 2
-        k_frac[:, 2] = (x3 - 2 * logx * x2 - x) / 2 / (x - 1) ** 3
-        k_frac[:, 3] = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / 6 / (x - 1) ** 4
-        k_frac[:, 4] = (
-            (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x)
-            / 12
-            / (x - 1) ** 5
-        )
-        k_frac[:, 5] = (
+        denom = x - 1
+        k0 = (x - logx * x - 1) / denom
+        return k0
+
+    @staticmethod
+    def formula_1(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of hapax legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.1 in https://arxiv.org/pdf/1901.00521.pdf
+        """
+        logx = np.log(x)
+        x2 = x ** 2
+        denom = (x - 1) ** 2
+        k1 = (x2 - logx * x - x) / denom
+        return k1
+
+    @staticmethod
+    def formula_2(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of dis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.2 in https://arxiv.org/pdf/1901.00521.pdf
+        """
+        logx = np.log(x)
+        x2, x3 = x ** 2, x ** 3
+        denom = 2 * (x - 1) ** 3
+        k2 = (x3 - 2 * logx * x2 - x) / denom
+        return k2
+
+    @staticmethod
+    def formula_3(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of tris legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.3 in https://arxiv.org/pdf/1901.00521.pdf
+        """
+        logx = np.log(x)
+        x2, x3, x4 = x ** 2, x ** 3, x ** 4
+        denom = 6 * (x - 1) ** 4
+        k3 = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / denom
+        return k3
+
+    @staticmethod
+    def formula_4(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of tetrakis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.4 in https://arxiv.org/pdf/1901.00521.pdf
+        """
+        logx = np.log(x)
+        x2, x3, x4, x5 = x ** 2, x ** 3, x ** 4, x ** 5
+        denom = 12 * (x - 1) ** 5
+        k4 = (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x) / denom
+        return k4
+
+    @staticmethod
+    def formula_5(x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of pentakis legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn 17.5 in https://arxiv.org/pdf/1901.00521.pdf
+        """
+        logx = np.log(x)
+        x2, x3, x4, x5, x6 = x ** 2, x ** 3, x ** 4, x ** 5, x ** 6
+        k5 = (
             (12 * x6 - 60 * logx * x5 + 65 * x5 - 120 * x4 + 60 * x3 - 20 * x2 + 3 * x)
             / 60
             / (x - 1) ** 6
         )
+        return k5
 
-        # limiting values @ x=0 & x=1
-        _k_frac[x_iszero, :] = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        _k_frac[x_isone, :] = np.array(
-            [0.0, 1.0 / 2, 1.0 / 6, 1.0 / 12, 1.0 / 20, 1.0 / 30]
-        )
-        _k_frac[x_isokay] = k_frac
+    @staticmethod
+    def formula_n(n: int, x: np.ndarray) -> np.ndarray:
+        """
+        Predicted number of n-legomena when sampling proportion x of corpus,
+            as a proportion of total types.
+
+        NOTE: Unpublished generalization of eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
+        $$
+        \hat{k}_0(x) = 1 - \phi\bigg(\frac{x-1}{x}, 1, n+1\bigg) \\
+        \hat{k}_n(x) = \frac{1}{n} - \frac{1}{x}\phi\bigg(\frac{x-1}{x}, 1, n+1\bigg)
+        $$
+        """
+
+        def _lerchphi(z, s, a):
+            """
+            Wrapper function for mpmath.lerchphi(z,s,a) with two changes:
+            1. Returns phi(-inf, 1, n+1) -> 0
+            2. Returns real part only
+            """
+
+            # lim z to -inf lerchphi(z, 1, n+1) -> 0
+            if z == -np.inf:
+                return 0.0
+
+            # delegate to mpmath
+            mpc = lerchphi(z, s, a)
+
+            # assume no imaginary component
+            mpf = float(mpc.real)
+
+            # return
+            return mpf
+
+        def _zlerchphi(z, s, a):
+            """
+            Wrapper function for (1-z)*mpmath.lerchphi(z,s,a) with two changes:
+            1. Returns inf * phi(-inf, 1, n+1) -> 1/n
+            2. Returns real part only
+            """
+
+            # lim z to -inf (1-z) lerchphi(z, 1, n+1) -> 1/n
+            if z == -np.inf:
+                return 1 / (a - 1)
+
+            # forward and adjust
+            mpf = (1 - z) * _lerchphi(z, s, a)
+
+            # return
+            return mpf
+
+        # vectorize mpmath.lerchphi
+        vlerchphi = np.vectorize(_lerchphi)
+        vzlerchphi = np.vectorize(_zlerchphi)
+
+        # express x as z = x/(x-1)
+        z = x / (x - 1)
+
+        # special case @n=0
+        if n == 0:
+            kn = 1 - vlerchphi(1 / z, 1, n + 1)
+        else:
+            kn = 1 / n - vzlerchphi(1 / z, 1, n + 1)
+
+        # return
+        return kn
+
+    def formula(self, x: np.ndarray, dim: int) -> np.ndarray:
+        """
+        Predicts normalized k-vector for given proportion of tokens.
+        NOTE: Eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
+        :param x: List-like independent variable x, the proportion of tokens
+        :param dim: Desired dimension for returned vector
+        :returns k_frac: Expected proportions of n-legomena for n = 0 to dim
+        """
+
+        # coerce into dimensionless array
+        x = np.array(x).reshape(-1)
+
+        # apply kn formula to each value of n
+        k_frac = np.array([self.formula_n(n, x) for n in range(dim)])
+        k_frac = k_frac.T
 
         # return proportions
-        return _k_frac
+        return k_frac
 
     def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int):
         """
@@ -272,7 +345,7 @@ class LogModel:
         m_tokens = np.array(m_tokens).reshape(-1)
 
         # redirect: E(m) = N_z - k_0(m)
-        k = self.predict_k(m_tokens, nearest_int=nearest_int)
+        k = self.predict_k(m_tokens, dim=1, nearest_int=nearest_int)
         n_types = self.N_z - k[:, 0]
 
         # allow scalar
@@ -284,14 +357,19 @@ class LogModel:
         return n_types
 
     def predict_k(
-        self, m_tokens: np.ndarray, normalize: bool = False, nearest_int: bool = True
+        self,
+        m_tokens: np.ndarray,
+        dim: int,
+        normalize: bool = False,
+        nearest_int: bool = True,
     ) -> np.ndarray:
         """
         Applies the log formula to model the k-vector as a function of tokens.
         :param m_tokens: Number of tokens (scalar or list-like)
+        :param dim: (int) Desired dimension of vector k
         :param normalize: (bool, False) Return proportions instead of counts
         :param nearest_int: (bool, True) Round predictions to the nearest integer
-        :returns k: Predicted n-legomena counts for n = 0 to 5
+        :returns k: Predicted n-legomena counts for n = 0 to dim-1
         """
 
         # allow scalar
@@ -303,7 +381,7 @@ class LogModel:
 
         # scale down to normalized log formula
         x = m_tokens / M_z
-        k_frac = self.formula(x)
+        k_frac = self.formula(x, dim)
 
         # normalize, or don't
         if normalize:
@@ -435,7 +513,7 @@ class Corpus(Counter):
 
     @property
     def dimension(self) -> int:
-        """The desired dimension of the problem, highest n for which n-legomena counts are included in TTR."""
+        """The desired dimension of the problem, include n-legomena counts for n = 0 to dim-1."""
         return self.options.dimension
 
     @dimension.setter

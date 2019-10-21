@@ -15,8 +15,8 @@ GRAPHICS_ON = False
 SEED = 42
 
 # standard error
-def std_err(y: float, y_hat: float):
-    return abs(y_hat - y) / y
+def std_err(y, y_hat):
+    return np.abs(y_hat - y) / y
 
 
 # root mean squared error as a percent of total types (normalized)
@@ -261,7 +261,8 @@ class LegomenaTest(unittest.TestCase):
 
         # initialize class
         corpus = Corpus(words)
-        corpus.dimension = 5
+        dim = 6
+        corpus.dimension = dim
         corpus.seed = SEED
         TTR = corpus.TTR
 
@@ -272,7 +273,7 @@ class LegomenaTest(unittest.TestCase):
 
         # generate single prediction
         E_m = model.predict(corpus.M)
-        k = model.predict_k(corpus.M)
+        k = model.predict_k(corpus.M, dim)
         assert std_err(corpus.N, E_m) < 0.0001
         assert std_err(corpus.k[1], k[1]) < 0.001
         assert std_err(corpus.k[2], k[2]) < 0.005
@@ -302,7 +303,7 @@ class LegomenaTest(unittest.TestCase):
             plt.show()
 
             # predicted hapax fraction
-            k = model.predict_k(m_tokens)
+            k = model.predict_k(m_tokens, dim)
             predictions = k[:, 1] / E_m
             realization = TTR.lego_1 / n_types
             plt.scatter(m_tokens, realization)
@@ -370,3 +371,158 @@ class LegomenaTest(unittest.TestCase):
         model.fit(TTR.m_tokens, TTR.n_types)
         after = model.params
         assert before == after
+
+    # generalized formula matches explicit formula
+    def test_generalized(self):
+
+        # apply both formulas to random selection of x values
+        model = LogModel()
+        np.random.seed(SEED)
+        x = 2 * np.random.rand(99)
+
+        # explicit formulas
+        k0 = model.formula_0(x)
+        k1 = model.formula_1(x)
+        k2 = model.formula_2(x)
+        k3 = model.formula_3(x)
+        k4 = model.formula_4(x)
+        k5 = model.formula_5(x)
+
+        # generalized formula
+        kn0 = model.formula_n(0, x)
+        kn1 = model.formula_n(1, x)
+        kn2 = model.formula_n(2, x)
+        kn3 = model.formula_n(3, x)
+        kn4 = model.formula_n(4, x)
+        kn5 = model.formula_n(5, x)
+
+        # all "close"
+        assert RMSE_pct(k0, kn0) < 1e-15
+        assert RMSE_pct(k1, kn1) < 1e-12
+        assert RMSE_pct(k2, kn2) < 1e-10
+        assert RMSE_pct(k3, kn3) < 1e-08
+        assert RMSE_pct(k4, kn4) < 1e-05
+        assert RMSE_pct(k5, kn5) < 1e-03
+
+    # generalized formula contains no singularities
+    def test_singularities(self):
+
+        # singularity @ x=0
+        model = LogModel()
+
+        # explicit formula singularity @x=0
+        x = np.array([0.0])
+        assert np.isnan(model.formula_0(x)[0])
+        assert np.isnan(model.formula_1(x)[0])
+        assert np.isnan(model.formula_2(x)[0])
+        assert np.isnan(model.formula_3(x)[0])
+        assert np.isnan(model.formula_4(x)[0])
+        assert np.isnan(model.formula_5(x)[0])
+
+        # generalized formula returns correct answer
+        assert model.formula_n(0, x)[0] == 1.0
+        assert model.formula_n(1, x)[0] == 0.0
+        assert model.formula_n(2, x)[0] == 0.0
+        assert model.formula_n(3, x)[0] == 0.0
+        assert model.formula_n(4, x)[0] == 0.0
+        assert model.formula_n(5, x)[0] == 0.0
+
+        # singularity @ x=1
+        eps = 1e-6
+        x = np.array([1 - eps, 1 + eps])
+
+        # limiting values as eps -> 0, x -> 1
+        k0_ = 0.0
+        k1_ = 1 / 1 - 1 / 2  # 1/2
+        k2_ = 1 / 2 - 1 / 3  # 1/6
+        k3_ = 1 / 3 - 1 / 4  # 1/12
+        k4_ = 1 / 4 - 1 / 5  # 1/20
+        k5_ = 1 / 5 - 1 / 6  # 1/30
+
+        # explicit formulas
+        explicit_delta0 = abs(model.formula_0(x) - k0_)
+        explicit_delta1 = abs(model.formula_1(x) - k1_)
+        explicit_delta2 = abs(model.formula_2(x) - k2_)
+        explicit_delta3 = abs(model.formula_3(x) - k3_)
+        explicit_delta4 = abs(model.formula_4(x) - k4_)
+        explicit_delta5 = abs(model.formula_5(x) - k5_)
+
+        # generalized formula
+        generalized_delta0 = abs(model.formula_n(0, x) - k0_)
+        generalized_delta1 = abs(model.formula_n(1, x) - k1_)
+        generalized_delta2 = abs(model.formula_n(2, x) - k2_)
+        generalized_delta3 = abs(model.formula_n(3, x) - k3_)
+        generalized_delta4 = abs(model.formula_n(4, x) - k4_)
+        generalized_delta5 = abs(model.formula_n(5, x) - k5_)
+
+        # explicit formula diverges from limiting value
+        assert all(explicit_delta1 > eps)
+        assert all(explicit_delta2 > eps * 1e5)
+        assert all(explicit_delta3 > eps * 1e13)
+        assert all(explicit_delta4 > eps * 1e18)
+        assert all(explicit_delta5 > eps * 1e25)
+
+        # generalized formula tends toward limiting value
+        assert all(generalized_delta0 < eps)
+        assert all(generalized_delta1 < eps)
+        assert all(generalized_delta2 < eps)
+        assert all(generalized_delta3 < eps)
+        assert all(generalized_delta4 < eps)
+        assert all(generalized_delta5 < eps)
+
+        # explicit formula singularity @x=1
+        x = np.array([1.0])
+        assert np.isnan(model.formula_0(x)[0])
+        assert np.isnan(model.formula_1(x)[0])
+        assert np.isnan(model.formula_2(x)[0])
+        assert np.isnan(model.formula_3(x)[0])
+        assert np.isnan(model.formula_4(x)[0])
+        assert np.isnan(model.formula_5(x)[0])
+
+        # generalized formula returns correct answer
+        assert model.formula_n(0, x)[0] == k0_
+        assert model.formula_n(1, x)[0] == k1_
+        assert model.formula_n(2, x)[0] == k2_
+        assert model.formula_n(3, x)[0] == k3_
+        assert model.formula_n(4, x)[0] == k4_
+        assert model.formula_n(5, x)[0] == k5_
+
+    # check model k_n predictions for n > 5
+    def test_high_dimensions(self):
+
+        # retrieve corpus from NLTK
+        filename = "melville-moby_dick.txt"
+        words = gutenberg.words(filename)
+
+        # initialize class
+        corpus = Corpus(words)
+        dim = 64
+        corpus.dimension = dim
+        corpus.seed = SEED
+        TTR = corpus.TTR
+
+        # k vector calculated correctly
+        raw = corpus.k[:dim]
+        agg = TTR.tail(1).values[0, 2:]
+        assert all(agg == raw)
+
+        # create & fit model
+        m_tokens, n_types = TTR.m_tokens, TTR.n_types
+        model = LogModel().fit(m_tokens, n_types)
+
+        # predict E(M) & k_n(M)
+        model.dimension = dim
+        E_m = model.predict(corpus.M)
+        k = model.predict_k(corpus.M, dim)
+        assert len(k) == dim
+        err = std_err(corpus.k[:dim], k)
+
+        # visualize error
+        if GRAPHICS_ON:
+            import matplotlib.pyplot as plt
+
+            plt.plot(err)
+            plt.title("Error Analysis")
+            plt.xlabel("n = k-vector index")
+            plt.ylabel("std error")
+            plt.show()
