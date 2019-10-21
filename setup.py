@@ -14,6 +14,6 @@ setup(
     author="Victor Davis",
     author_email="vadsql@gmail.com",
     url="https://github.com/VictorDavis/legomena",
-    install_requires=["nltk", "numpy", "pandas", "scipy"],
+    install_requires=["mpmath", "nltk", "numpy", "pandas", "scipy"],
     python_requires=">=3.5",
 )
