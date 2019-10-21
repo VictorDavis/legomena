@@ -101,10 +101,9 @@ class LogModel:
     _params = None
 
     # user options
-    UserOptions = namedtuple("UserOptions", ("epsilon", "dimension"))
+    UserOptions = namedtuple("UserOptions", ("dimension",))
     _options = UserOptions(
-        epsilon=1e-3,  # distance to singularity to return limiting value
-        dimension=6,  # max value of n returned for n-legomena count prediction
+        dimension=6  # max value of n returned for n-legomena count prediction
     )
 
     @property
@@ -141,26 +140,15 @@ class LogModel:
         self._options = opt_
 
     @property
-    def epsilon(self) -> float:
-        """Distance to singularity to return limiting value."""
-        return self.options.epsilon
-
-    @epsilon.setter
-    def epsilon(self, eps_: int):
-        eps, dim = self.options
-        eps = eps_
-        self.options = (eps, dim)
-
-    @property
     def dimension(self) -> int:
         """Max value of n returned for n-legomena count prediction."""
         return self.options.dimension
 
     @dimension.setter
     def dimension(self, dim_: int):
-        eps, dim = self.options
+        dim = self.options
         dim = dim_
-        self.options = (eps, dim)
+        self.options = (dim,)
 
     @staticmethod
     def formula_0(x: np.ndarray) -> np.ndarray:
