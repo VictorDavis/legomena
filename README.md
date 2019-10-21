@@ -91,7 +91,8 @@ model.params
 predictions = model.predict(m_tokens)
 
 # log model only
-predicted_k = model.predict_k(m_tokens)
+dim = corpus.dimension
+predicted_k = model.predict_k(m_tokens, dim)
 ```
 
 ## Demo App
