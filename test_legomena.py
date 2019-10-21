@@ -11,7 +11,7 @@ import unittest
 from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel
 
 # globals
-GRAPHICS_ON = True
+GRAPHICS_ON = False
 SEED = 42
 
 # standard error
