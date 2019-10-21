@@ -247,20 +247,63 @@ class LogModel:
         """
         Predicted number of n-legomena when sampling proportion x of corpus,
             as a proportion of total types.
+
         NOTE: Unpublished generalization of eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
+        $$
+        \hat{k}_0(x) = 1 - \phi\bigg(\frac{x-1}{x}, 1, n+1\bigg) \\
+        \hat{k}_n(x) = \frac{1}{n} - \frac{1}{x}\phi\bigg(\frac{x-1}{x}, 1, n+1\bigg)
+        $$
         """
 
-        # mpmath.lerchphi is not vectorized
-        def _lerchphi(zvec: np.ndarray, s: float, a: float) -> np.ndarray:
-            val = [lerchphi(z, s, a) for z in zvec]
-            val = np.array([float(v.real) for v in val])
-            return val
+        def _lerchphi(z, s, a):
+            """
+            Wrapper function for mpmath.lerchphi(z,s,a) with two changes:
+            1. Returns phi(-inf, 1, n+1) -> 0
+            2. Returns real part only
+            """
+
+            # lim z to -inf lerchphi(z, 1, n+1) -> 0
+            if z == -np.inf:
+                return 0.0
+
+            # delegate to mpmath
+            mpc = lerchphi(z, s, a)
+
+            # assume no imaginary component
+            mpf = float(mpc.real)
+
+            # return
+            return mpf
+
+        def _zlerchphi(z, s, a):
+            """
+            Wrapper function for (1-z)*mpmath.lerchphi(z,s,a) with two changes:
+            1. Returns inf * phi(-inf, 1, n+1) -> 1/n
+            2. Returns real part only
+            """
+
+            # lim z to -inf (1-z) lerchphi(z, 1, n+1) -> 1/n
+            if z == -np.inf:
+                return 1 / (a - 1)
+
+            # forward and adjust
+            mpf = (1 - z) * _lerchphi(z, s, a)
+
+            # return
+            return mpf
+
+        # vectorize mpmath.lerchphi
+        vlerchphi = np.vectorize(_lerchphi)
+        vzlerchphi = np.vectorize(_zlerchphi)
+
+        # express x as z = x/(1-x)
+        z = x / (x - 1)
 
         # special case @n=0
         if n == 0:
-            kn = 1 - _lerchphi((x - 1) / x, 1, n + 1)
+            kn = 1 - vlerchphi(1 / z, 1, n + 1)
         else:
-            kn = x / (x - 1) / n - _lerchphi((x - 1) / x, 1, n) / (x - 1)
+            kn = 1 / n - vzlerchphi(1 / z, 1, n + 1)
 
         # return
         return kn
@@ -273,52 +316,18 @@ class LogModel:
         :returns k_frac: Expected proportions of n-legomena for n = 0 to dim
         """
 
+        # coerce into dimensionless array
         x = np.array(x).reshape(-1)
 
-        # TODO: implement generalized formula
-        epsilon = self.options.epsilon
+        # desired size of k-vector
         dim = self.options.dimension
 
-        # initialize return vectors
-        _k_frac = np.zeros((len(x), dim))
-
-        # two singularities @ x=0 & x=1
-        x_iszero = np.abs(x) < epsilon  # singularity @ x=0
-        x_isone = np.abs(x - 1.0) < epsilon  # singularity @ x=1
-        x_isokay = ~np.logical_or(x_iszero, x_isone)
-        x = x[x_isokay]
-
-        # initialize results
-        k_frac = np.zeros((len(x), dim))
-        for n in range(dim):
-            if n == 0:
-                k_frac[:, 0] = self.formula_0(x)
-            elif n == 1:
-                k_frac[:, 1] = self.formula_1(x)
-            elif n == 2:
-                k_frac[:, 2] = self.formula_2(x)
-            elif n == 3:
-                k_frac[:, 3] = self.formula_3(x)
-            elif n == 4:
-                k_frac[:, 4] = self.formula_4(x)
-            elif n == 5:
-                k_frac[:, 5] = self.formula_5(x)
-            else:
-                k_frac[:, n] = self.formula_n(n, x)
-
-        # limiting values @ x=0 & x=1
-        if dim >= 1:
-            _k_frac[x_iszero, 0] = 1.0
-            _k_frac[x_isone, 0] = 0.0
-            if dim > 1:
-                _k_frac[x_iszero, 1:] = 0.0
-                _k_frac[x_isone, 1:] = (
-                    1.0 / np.arange(1, dim) / (1 / np.arange(2, dim + 1))
-                )
-        _k_frac[x_isokay] = k_frac
+        # apply kn formula to each value of n
+        k_frac = np.array([self.formula_n(n, x) for n in range(dim)])
+        k_frac = k_frac.T
 
         # return proportions
-        return _k_frac
+        return k_frac
 
     def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int):
         """
