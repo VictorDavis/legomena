@@ -113,7 +113,7 @@ def plotTTR(source, fileid):
     # fit logarithmic model to TTR curve
     lmodel = LogModel().fit(m_tokens, n_types)
     TTR["n_types_pred_log"] = lmodel.predict(m_tokens)
-    k_pred = lmodel.predict_k(TTR.m_tokens)
+    k_pred = lmodel.predict_k(TTR.m_tokens, dim=corpus.dimension)
     dim = k_pred.shape[1]
     for n in range(dim):
         TTR["lego_%s_pred" % n] = k_pred[:, n]
@@ -188,7 +188,7 @@ def plotLego(source, fileid):
 
     # fit logarithmic model to TTR curve
     lmodel = LogModel().fit(m_tokens, n_types)
-    k_pred = lmodel.predict_k(m_tokens, normalize=True)
+    k_pred = lmodel.predict_k(m_tokens, dim=corpus.dimension, normalize=True)
     dim = k_pred.shape[1]
     for n in range(dim):
         actual = "lego_%s" % n
