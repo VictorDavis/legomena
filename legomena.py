@@ -225,6 +225,11 @@ class LogModel:
             if z == -np.inf:
                 return 0.0
 
+            # recurse (dramatic speedup)
+            # REF: http://mpmath.org/doc/current/functions/zeta.html#lerchphi
+            if a > 1 and abs(z) > 0.01:
+                return (_lerchphi(z, s, a - 1) - 1 / (a - 1)) / z
+
             # delegate to mpmath
             mpc = lerchphi(z, s, a)
 
