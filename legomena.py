@@ -218,18 +218,19 @@ class LogModel:
 
         # special case @n=0
         if n == 0:
-            kn = 1 - self._vlerchphi(1 / z, 1, n + 1)
+            kn = 1 - self._vlerchphi(1 / z, n + 1)
         else:
-            kn = 1 / n - self._vzlerchphi(1 / z, 1, n + 1)
+            kn = 1 / n - self._vzlerchphi(1 / z, n + 1)
 
         # return
         return kn
 
-    def _lerchphi(self, z: float, s: int, a: int) -> float:
+    def _lerchphi(self, z: float, a: int) -> float:
         """
-        Wrapper function for mpmath.lerchphi(z,s,a) with two changes:
+        Wrapper function for mpmath.lerchphi(z,s,a) with three changes:
         1. Returns phi(-inf, 1, n+1) -> 0
         2. Returns real part only
+        3. For this application, s=1 always
         """
 
         # lim z to -inf lerchphi(z, 1, n+1) -> 0
@@ -239,10 +240,10 @@ class LogModel:
         # recurse (dramatic speedup)
         # REF: http://mpmath.org/doc/current/functions/zeta.html#lerchphi
         if a > 1 and abs(z) > 0.01:
-            return (self._lerchphi(z, s, a - 1) - 1 / (a - 1)) / z
+            return (self._lerchphi(z, a - 1) - 1 / (a - 1)) / z
 
         # delegate to mpmath
-        mpc = lerchphi(z, s, a)
+        mpc = lerchphi(z, 1, a)
 
         # assume no imaginary component
         mpf = float(mpc.real)
@@ -250,11 +251,12 @@ class LogModel:
         # return
         return mpf
 
-    def _zlerchphi(self, z: float, s: int, a: int) -> float:
+    def _zlerchphi(self, z: float, a: int) -> float:
         """
-        Wrapper function for (1-z)*mpmath.lerchphi(z,s,a) with two changes:
+        Wrapper function for (1-z)*mpmath.lerchphi(z,s,a) with three changes:
         1. Returns inf * phi(-inf, 1, n+1) -> 1/n
         2. Returns real part only
+        3. For this application, s=1 always
         """
 
         # lim z to -inf (1-z) lerchphi(z, 1, n+1) -> 1/n
@@ -262,18 +264,18 @@ class LogModel:
             return 1 / (a - 1)
 
         # forward and adjust
-        mpf = (1 - z) * self._lerchphi(z, s, a)
+        mpf = (1 - z) * self._lerchphi(z, a)
 
         # return
         return mpf
 
-    def _vlerchphi(self, z: np.ndarray, s: int, a: int) -> np.ndarray:
+    def _vlerchphi(self, z: np.ndarray, a: int) -> np.ndarray:
         """Vectorized wrapper function for _lerchphi()"""
-        return np.array([self._lerchphi(z_, s, a) for z_ in z])
+        return np.array([self._lerchphi(z_, a) for z_ in z])
 
-    def _vzlerchphi(self, z: np.ndarray, s: int, a: int) -> np.ndarray:
+    def _vzlerchphi(self, z: np.ndarray, a: int) -> np.ndarray:
         """Vectorized wrapper function for _zlerchphi()"""
-        return np.array([self._zlerchphi(z_, s, a) for z_ in z])
+        return np.array([self._zlerchphi(z_, a) for z_ in z])
 
     def formula(self, x: np.ndarray, dim: int) -> np.ndarray:
         """
