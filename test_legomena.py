@@ -427,10 +427,6 @@ class LegomenaTest(unittest.TestCase):
         assert model.formula_n(4, x)[0] == 0.0
         assert model.formula_n(5, x)[0] == 0.0
 
-        # singularity @ x=1
-        eps = 1e-6
-        x = np.array([1 - eps, 1 + eps])
-
         # limiting values as eps -> 0, x -> 1
         k0_ = 0.0
         k1_ = 1 / 1 - 1 / 2  # 1/2
@@ -438,6 +434,27 @@ class LegomenaTest(unittest.TestCase):
         k3_ = 1 / 3 - 1 / 4  # 1/12
         k4_ = 1 / 4 - 1 / 5  # 1/20
         k5_ = 1 / 5 - 1 / 6  # 1/30
+
+        # explicit formula singularity @x=1
+        x = np.array([1.0])
+        assert np.isnan(model.formula_0(x)[0])
+        assert np.isnan(model.formula_1(x)[0])
+        assert np.isnan(model.formula_2(x)[0])
+        assert np.isnan(model.formula_3(x)[0])
+        assert np.isnan(model.formula_4(x)[0])
+        assert np.isnan(model.formula_5(x)[0])
+
+        # generalized formula returns correct answer
+        assert model.formula_n(0, x)[0] == k0_
+        assert model.formula_n(1, x)[0] == k1_
+        assert model.formula_n(2, x)[0] == k2_
+        assert model.formula_n(3, x)[0] == k3_
+        assert model.formula_n(4, x)[0] == k4_
+        assert model.formula_n(5, x)[0] == k5_
+
+        # singularity @ x=1
+        eps = 1e-6
+        x = np.array([1 - eps, 1 + eps])
 
         # explicit formulas
         explicit_delta0 = abs(model.formula_0(x) - k0_)
@@ -470,22 +487,13 @@ class LegomenaTest(unittest.TestCase):
         assert all(generalized_delta4 < eps)
         assert all(generalized_delta5 < eps)
 
-        # explicit formula singularity @x=1
-        x = np.array([1.0])
-        assert np.isnan(model.formula_0(x)[0])
-        assert np.isnan(model.formula_1(x)[0])
-        assert np.isnan(model.formula_2(x)[0])
-        assert np.isnan(model.formula_3(x)[0])
-        assert np.isnan(model.formula_4(x)[0])
-        assert np.isnan(model.formula_5(x)[0])
-
-        # generalized formula returns correct answer
-        assert model.formula_n(0, x)[0] == k0_
-        assert model.formula_n(1, x)[0] == k1_
-        assert model.formula_n(2, x)[0] == k2_
-        assert model.formula_n(3, x)[0] == k3_
-        assert model.formula_n(4, x)[0] == k4_
-        assert model.formula_n(5, x)[0] == k5_
+        # keep going...
+        one = np.array([1.0])
+        for n in range(6, 99):
+            kn_ = 1 / n - 1 / (n + 1)
+            generalized_delta = abs(model.formula_n(n, x) - kn_)
+            assert all(generalized_delta < eps)
+            assert model.formula_n(n, one)[0] == kn_
 
     # check model k_n predictions for n > 5
     def test_high_dimensions(self):
