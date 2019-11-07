@@ -331,7 +331,8 @@ class LogModel:
         p0 = self.fit_naive(M, N, H).params
 
         # minimize MSE on random perturbations of M_z, N_z
-        func = lambda m, M_z, N_z: N_z * np.log(m / M_z) * m / M_z / (m / M_z - 1)
+        # NOTE: y(x) = 1 - k0(x) -> E(m)/Nz = Nz * (1 - k0(m / Mz))
+        func = lambda m, M_z, N_z: N_z * (1 - self.formula_0(m / M_z))
         xdata = np.array(m_tokens)
         ydata = np.array(n_types)
         params_, _ = curve_fit(func, xdata, ydata, p0)
