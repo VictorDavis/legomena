@@ -1,6 +1,6 @@
 # bloody dependencies
 from collections import Counter, namedtuple
-from mpmath import lerchphi
+from mpmath import lerchphi, zeta, polylog
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
@@ -421,6 +421,129 @@ class LogModel:
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
         :returns: Number of types as predicted by logarithmic model
+        """
+
+        # fit and predict
+        return self.fit(m_tokens, n_types).predict(m_tokens)
+
+
+class FontClosModel:
+    """
+    Types = N * (1 - Li_γ(1 - Tokens/M)/ζ(γ))
+    NOTE: Eqn (8) in https://arxiv.org/pdf/1412.4577.pdf
+    """
+
+    # params
+    FontClosParams = namedtuple("FontClosParams", ("M", "N", "gamma"))
+    _params = None
+
+    @property
+    def params(self) -> tuple:  # FontClosParams
+        assert (
+            self._params is not None
+        ), "Please use .fit(m_tokens, n_types) to fit the model."
+        return self._params
+
+    @params.setter
+    def params(self, params_: tuple):
+        self._params = self.FontClosParams(*params_)
+
+    @property
+    def M(self) -> int:
+        """Number of tokens in the corpus."""
+        return self.params.M
+
+    @property
+    def N(self) -> int:
+        """Number of types in the corpus."""
+        return self.params.N
+
+    @property
+    def gamma(self) -> int:
+        """The discrete power-law distribution parameter."""
+        return self.params.gamma
+
+    def __init__(self, M: float, N: float):
+        """
+        Initialize Font-Clos Model with non-trainable parameters:
+        :param M: Number of tokens in the corpus
+        :param N: Number of types in the corpus
+
+        NOTE: An unfit model will be parametrized as γ=2. Fitting
+              the model to data fine-tunes an optimal γ to the data.
+        """
+
+        # initialize parameters
+        default_gamma = 2.0
+        self.params = (M, N, default_gamma)
+
+    def formula(self, x: np.ndarray, gamma: float = None) -> np.ndarray:
+        """
+        Predicted number of types sampled in proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn (8) in https://arxiv.org/pdf/1412.4577.pdf
+        """
+        gamma = gamma or self.gamma
+        Li = self._vpolylog(gamma, 1 - x)
+        A = 1 / float(zeta(gamma).real)
+        y = 1 - A * Li
+        return y
+
+    def _vpolylog(self, s: float, z: np.ndarray) -> np.ndarray:
+        """Vectorized wrapper function for mpmath.polylog()"""
+        _polylog = lambda s, z_: float(polylog(s, z_).real)
+        return np.array([_polylog(s, z_) for z_ in z])
+
+    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray):
+        """
+        Uses scipy.optimize.curve_fit() to fit the log model to type-token data.
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: (self) Fitted model
+        """
+
+        # minimize MSE on random perturbations of gamma
+        xdata = np.array(m_tokens) / self.M
+        ydata = np.array(n_types) / self.N
+        p0 = self.gamma  # initial guess for gamma
+        [gamma_], _ = curve_fit(self.formula, xdata, ydata, p0)
+        M, N, _ = self.params
+        self.params = (M, N, gamma_)
+
+        # return fitted model
+        return self
+
+    def predict(self, m_tokens: np.ndarray, nearest_int: bool = True) -> np.ndarray:
+        """
+        Calculate & return n_types = N * formula(m_tokens/M)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
+        :returns: Number of types as predicted by Font-Clos model.
+        """
+
+        # allow scalar
+        return_scalar = np.isscalar(m_tokens)
+        m_tokens = np.array(m_tokens).reshape(-1)
+
+        # redirect: E(m) = N * formula(m/M)
+        n_types = self.N * self.formula(m_tokens / self.M)
+        if nearest_int:
+            n_types = np.round(n_types)
+
+        # allow scalar
+        if return_scalar:
+            assert len(n_types) == 1
+            n_types = float(n_types)
+
+        # return number of types
+        return n_types
+
+    def fit_predict(self, m_tokens: np.ndarray, n_types: np.ndarray) -> np.ndarray:
+        """
+        Equivalent to fit(m_tokens, n_types).predict(m_tokens)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: Number of types as predicted by Font-Clos model
         """
 
         # fit and predict
