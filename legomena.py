@@ -70,6 +70,8 @@ class HeapsModel:
         # run model
         K, B = self.params
         n_types = K * np.power(m_tokens, B)
+
+        # roundoff
         if nearest_int:
             n_types = np.round(n_types)
 
@@ -404,6 +406,8 @@ class LogModel:
         else:
             # predicted counts
             k = N_z * k_frac
+
+            # roundoff
             if nearest_int:
                 k = np.round(k)
 
@@ -527,6 +531,8 @@ class FontClosModel:
 
         # redirect: E(m) = N * formula(m/M)
         n_types = self.N * self.formula(m_tokens / self.M)
+
+        # roundoff
         if nearest_int:
             n_types = np.round(n_types)
 
@@ -790,6 +796,8 @@ class InfSeriesModel:
         terms = np.array([np.power(1 - x, n) for n in exponents])
         k_0 = np.dot(self.k, terms)
         n_types = self.N - k_0
+
+        # roundoff
         if nearest_int:
             n_types = np.round(n_types)
 
