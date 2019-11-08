@@ -8,7 +8,7 @@ import pandas as pd
 import unittest
 
 # classes to test
-from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel
+from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel, FontClosModel
 
 # globals
 GRAPHICS_ON = False
@@ -41,6 +41,37 @@ def spgc_read(fileid):
     # load as dictionary
     wfd = {str(row.word): int(row.freq) for row in df.itertuples()}
     return wfd
+
+
+def get_books():
+
+    # NLTK-SPGC lookup
+    books = pd.DataFrame(
+        [
+            ("austen-emma.txt", "PG158_counts.txt"),
+            ("austen-persuasion.txt", "PG105_counts.txt"),
+            ("austen-sense.txt", "PG161_counts.txt"),
+            ("bible-kjv.txt", "PG10_counts.txt"),
+            ("blake-poems.txt", "PG574_counts.txt"),
+            ("bryant-stories.txt", "PG473_counts.txt"),
+            ("burgess-busterbrown.txt", "PG22816_counts.txt"),
+            # ("carroll-alice.txt", "PG11_counts.txt"),  # SPGC missing PG11 :(
+            ("chesterton-ball.txt", "PG5265_counts.txt"),
+            ("chesterton-brown.txt", "PG223_counts.txt"),
+            ("chesterton-thursday.txt", "PG1695_counts.txt"),
+            ("edgeworth-parents.txt", "PG3655_counts.txt"),
+            ("melville-moby_dick.txt", "PG2701_counts.txt"),
+            ("milton-paradise.txt", "PG26_counts.txt"),
+            ("shakespeare-caesar.txt", "PG1120_counts.txt"),
+            ("shakespeare-hamlet.txt", "PG1122_counts.txt"),
+            ("shakespeare-macbeth.txt", "PG1129_counts.txt"),
+            ("whitman-leaves.txt", "PG1322_counts.txt"),
+        ],
+        columns=["nltk_id", "spgc_id"],
+    )
+
+    # return books
+    return books
 
 
 # unit tests
@@ -85,29 +116,7 @@ class LegomenaTest(unittest.TestCase):
     def test_spgc_nltk(self):
 
         # NLTK-SPGC lookup
-        books = pd.DataFrame(
-            [
-                ("austen-emma.txt", "PG158_counts.txt"),
-                ("austen-persuasion.txt", "PG105_counts.txt"),
-                ("austen-sense.txt", "PG161_counts.txt"),
-                ("bible-kjv.txt", "PG10_counts.txt"),
-                ("blake-poems.txt", "PG574_counts.txt"),
-                ("bryant-stories.txt", "PG473_counts.txt"),
-                ("burgess-busterbrown.txt", "PG22816_counts.txt"),
-                # ("carroll-alice.txt", "PG11_counts.txt"),  # SPGC missing PG11 :(
-                ("chesterton-ball.txt", "PG5265_counts.txt"),
-                ("chesterton-brown.txt", "PG223_counts.txt"),
-                ("chesterton-thursday.txt", "PG1695_counts.txt"),
-                ("edgeworth-parents.txt", "PG3655_counts.txt"),
-                ("melville-moby_dick.txt", "PG2701_counts.txt"),
-                ("milton-paradise.txt", "PG26_counts.txt"),
-                ("shakespeare-caesar.txt", "PG1120_counts.txt"),
-                ("shakespeare-hamlet.txt", "PG1122_counts.txt"),
-                ("shakespeare-macbeth.txt", "PG1129_counts.txt"),
-                ("whitman-leaves.txt", "PG1322_counts.txt"),
-            ],
-            columns=["nltk_id", "spgc_id"],
-        )
+        books = get_books()
 
         # build corpi from each source
         corpi = {}
@@ -209,8 +218,14 @@ class LegomenaTest(unittest.TestCase):
         predictions_log = lmodel.predict(m_tokens)
         L = lmodel.predict(1000)
 
+        # fit Font-Clos model to TTR curve
+        M, N = corpus.M, corpus.N
+        fmodel = FontClosModel(M, N).fit(m_tokens, n_types)
+        predictions_fontclos = lmodel.predict(m_tokens)
+        F = fmodel.predict(1000)
+
         # explicit check
-        assert (H, I, L) == (756, 513, 515)
+        assert (H, I, L, F) == (756, 513, 515, 770)
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -246,6 +261,14 @@ class LegomenaTest(unittest.TestCase):
             plt.scatter(m_tokens, n_types)
             plt.plot(m_tokens, predictions_log, color="red")
             plt.title("Logarithmic Model (M_z, N_z) = (%s, %s)" % lmodel.params)
+            plt.xlabel("tokens")
+            plt.ylabel("types")
+            plt.show()
+
+            # Font-Clos Model
+            plt.scatter(m_tokens, n_types)
+            plt.plot(m_tokens, predictions_fontclos, color="red")
+            plt.title("Font-Clos Model (γ = %s)" % fmodel.gamma)
             plt.xlabel("tokens")
             plt.ylabel("types")
             plt.show()
@@ -534,3 +557,66 @@ class LegomenaTest(unittest.TestCase):
             plt.xlabel("n = k-vector index")
             plt.ylabel("std error")
             plt.show()
+
+    # compare Font-Clos versus logarithmic model on SPGC data
+    def test_fontclos(self):
+
+        # loop over SPGC books
+        results = []
+        books = get_books()
+        for spgc_id in books.spgc_id:
+            wfd = spgc_read(spgc_id)
+            corpus = Corpus(wfd)
+
+            # fit TTR curve for all & compare RMSE
+            corpus.seed = SEED
+            TTR = corpus.TTR
+            m_tokens = TTR.m_tokens.values
+            n_types = TTR.n_types.values
+
+            # log model
+            lmodel = LogModel()
+            predictions_log = lmodel.fit_predict(m_tokens, n_types)
+            rmse_log = RMSE_pct(n_types, predictions_log)
+
+            # Font-Clos model
+            M, N = corpus.M, corpus.N
+            fmodel = FontClosModel(M, N)
+            predictions_fontclos = fmodel.fit_predict(m_tokens, n_types)
+            rmse_fontclos = RMSE_pct(n_types, predictions_fontclos)
+
+            # append results
+            results.append(
+                (
+                    spgc_id,
+                    corpus.M,
+                    corpus.N,
+                    lmodel.M_z,
+                    lmodel.N_z,
+                    fmodel.gamma,
+                    rmse_log,
+                    rmse_fontclos,
+                )
+            )
+
+        # aggregate & analyze results
+        results = pd.DataFrame(
+            results,
+            columns=[
+                "id",
+                "m_tokens",
+                "n_types",
+                "M_z",
+                "N_z",
+                "gamma",
+                "RMSE_log",
+                "RMSE_fontclos",
+            ],
+        ).set_index("id")
+
+        # save results
+        results.to_csv("data/fontclos.csv")
+
+        # assert both models performance
+        assert results.RMSE_log.max() < 0.01
+        assert results.RMSE_fontclos.max() < 0.015
