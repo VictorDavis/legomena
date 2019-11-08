@@ -500,7 +500,7 @@ class FontClosModel:
 
     def fit(self, m_tokens: np.ndarray, n_types: np.ndarray):
         """
-        Uses scipy.optimize.curve_fit() to fit the log model to type-token data.
+        Uses scipy.optimize.curve_fit() to fit the model to type-token data.
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
         :returns: (self) Fitted model
@@ -513,6 +513,25 @@ class FontClosModel:
         [gamma_], _ = curve_fit(self.formula, xdata, ydata, p0)
         M, N, _ = self.params
         self.params = (M, N, gamma_)
+
+        # return fitted model
+        return self
+
+    def fit_experimental(self, m_tokens: np.ndarray, n_types: np.ndarray):
+        """
+        Uses scipy.optimize.curve_fit() to fit the model to type-token data.
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: (self) Fitted model
+        """
+
+        # fix γ=2, but fit M, N to the data
+        xdata = np.array(m_tokens)
+        ydata = np.array(n_types)
+        p0 = (self.M, self.N)
+        func = lambda m, M, N: N * self.formula(m / M)
+        [M, N], _ = curve_fit(func, xdata, ydata, p0)
+        self.params = (M, N, 2.0)
 
         # return fitted model
         return self
