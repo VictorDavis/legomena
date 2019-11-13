@@ -220,7 +220,7 @@ class LegomenaTest(unittest.TestCase):
 
         # fit Font-Clos model to TTR curve
         M, N = corpus.M, corpus.N
-        fmodel = FontClosModel(M, N).fit(m_tokens, n_types)
+        fmodel = FontClosModel().fit(m_tokens, n_types)
         predictions_fontclos = lmodel.predict(m_tokens)
         F = fmodel.predict(1000)
 
@@ -581,7 +581,7 @@ class LegomenaTest(unittest.TestCase):
 
             # Font-Clos model
             M, N = corpus.M, corpus.N
-            fmodel = FontClosModel(M, N)
+            fmodel = FontClosModel()
             predictions_fontclos = fmodel.fit_predict(m_tokens, n_types)
             rmse_fontclos = RMSE_pct(n_types, predictions_fontclos)
 

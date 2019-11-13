@@ -467,20 +467,6 @@ class FontClosModel:
         """The discrete power-law distribution parameter."""
         return self.params.gamma
 
-    def __init__(self, M: float, N: float):
-        """
-        Initialize Font-Clos Model with non-trainable parameters:
-        :param M: Number of tokens in the corpus
-        :param N: Number of types in the corpus
-
-        NOTE: An unfit model will be parametrized as γ=2. Fitting
-              the model to data fine-tunes an optimal γ to the data.
-        """
-
-        # initialize parameters
-        default_gamma = 2.0
-        self.params = (M, N, default_gamma)
-
     def formula(self, x: np.ndarray, gamma: float = None) -> np.ndarray:
         """
         Predicted number of types sampled in proportion x of corpus,
@@ -498,40 +484,55 @@ class FontClosModel:
         _polylog = lambda s, z_: float(polylog(s, z_).real)
         return np.array([_polylog(s, z_) for z_ in z])
 
-    def fit(self, m_tokens: np.ndarray, n_types: np.ndarray):
+    def fit(
+        self, m_tokens: np.ndarray, n_types: np.ndarray, M: int = None, N: int = None
+    ):
         """
         Uses scipy.optimize.curve_fit() to fit the model to type-token data.
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
+        :param M: (optional) Number of tokens in the corpus, defaults to m_tokens.max()
+        :param N: (optional) Number of types in the corpus, defaults to n_types.max()
         :returns: (self) Fitted model
         """
 
+        # fix M, N
+        M = M or m_tokens.max()
+        N = N or n_types.max()
+
+        # initial guess
+        p0 = 2.0
+
         # minimize MSE on random perturbations of gamma
-        xdata = np.array(m_tokens) / self.M
-        ydata = np.array(n_types) / self.N
-        p0 = self.gamma  # initial guess for gamma
+        xdata = np.array(m_tokens) / M
+        ydata = np.array(n_types) / N
         [gamma_], _ = curve_fit(self.formula, xdata, ydata, p0)
-        M, N, _ = self.params
         self.params = (M, N, gamma_)
 
         # return fitted model
         return self
 
-    def fit_experimental(self, m_tokens: np.ndarray, n_types: np.ndarray):
+    def fit_experimental(self, m_tokens: np.ndarray, n_types: np.ndarray, gamma: float):
         """
-        Uses scipy.optimize.curve_fit() to fit the model to type-token data.
+        Same as fit(), only this time fix gamma and vary the scaling parameters M, N.
         :param m_tokens: Number of tokens, list-like independent variable
         :param n_types: Number of types, list-like dependent variable
+        :param gamma: Power-law distribution parameter to fix
         :returns: (self) Fitted model
         """
 
-        # fix γ=2, but fit M, N to the data
+        # initial guess
+        M = m_tokens.max()
+        N = n_types.max()
+        p0 = (M, N)
+
+        # fix gamma, but fit M, N to the data
         xdata = np.array(m_tokens)
         ydata = np.array(n_types)
-        p0 = (self.M, self.N)
-        func = lambda m, M, N: N * self.formula(m / M)
+        func = lambda m, M, N: N * self.formula(m / M, gamma)
         [M, N], _ = curve_fit(func, xdata, ydata, p0)
-        self.params = (M, N, 2.0)
+        M, N = int(M), int(N)
+        self.params = (M, N, gamma)
 
         # return fitted model
         return self
