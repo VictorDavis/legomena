@@ -103,7 +103,19 @@ class LegomenaTest(unittest.TestCase):
         assert sum(corpus.k) == corpus.N
         assert len(corpus.types) == corpus.N
         assert corpus.WFD.equals(corpus.fdist)
-        assert corpus.as_datarow(7) == (8354, 1820, 0, 1009, 293, 138, 72, 57, 41)
+        assert corpus.as_datarow(7) == (
+            8354,
+            1820,
+            0.9196082282619522,
+            1.7739943128244318,
+            0,
+            1009,
+            293,
+            138,
+            72,
+            57,
+            41,
+        )
 
         # sample()
         assert corpus.sample(99).M == 99
@@ -534,7 +546,7 @@ class LegomenaTest(unittest.TestCase):
 
         # k vector calculated correctly
         raw = corpus.k[:dim]
-        agg = TTR.tail(1).values[0, 2:]
+        agg = TTR.tail(1).values[0, 4:]
         assert all(agg == raw)
 
         # create & fit model
