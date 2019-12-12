@@ -584,13 +584,16 @@ class Corpus(Counter):
     _TTR = None  # dataframe containing type/token counts from corpus samples
     _tokens = None  # memoized list of tokens
     _types = None  # memoized list of types
+    _alpha = None  # memoized power-law parameter of word-frequency distribution
+    _gamma = None  # memoized power-law parameter of n-legomena distribution
 
     # user options
-    UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed"))
+    UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed", "rmin"))
     _options = UserOptions(
         resolution=100,  # number of samples to take when building a TTR curve
         dimension=7,  # vector size for holding n-legomena counts (zero-based)
         seed=None,  # random number seed for taking samples when building TTR
+        rmin=0.99,  # minimum tolerable r-value when fitting for alpha & gamma
     )
 
     @property
@@ -638,6 +641,14 @@ class Corpus(Counter):
         return karr
 
     @property
+    def kdf(self) -> pd.DataFrame:
+        """The frequency of n-legomena, as a dataframe."""
+        k = self.k
+        df = pd.DataFrame({"freq": k})
+        df = df.query("freq > 0")
+        return df
+
+    @property
     def M(self) -> int:
         """The number of tokens in the corpus."""
         m_tokens = sum(self.values())
@@ -655,10 +666,16 @@ class Corpus(Counter):
         return self._options
 
     @options.setter
-    def options(self, opt_: tuple):
-        self._options = self.UserOptions(*opt_)
+    def options(self, opt_):
+
+        # accept tuple or mapping
+        if isinstance(opt_, tuple):
+            self._options = self.UserOptions(*opt_)
+        else:
+            self._options = self.UserOptions(**opt_)
+
+        # clear properties affected by changed options
         self._TTR = None
-        self._params = None
 
     @property
     def resolution(self) -> int:
@@ -667,9 +684,9 @@ class Corpus(Counter):
 
     @resolution.setter
     def resolution(self, res_: int):
-        res, dim, seed = self.options
-        res = res_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["resolution"] = res_
+        self.options = options_
 
     @property
     def dimension(self) -> int:
@@ -678,9 +695,9 @@ class Corpus(Counter):
 
     @dimension.setter
     def dimension(self, dim_: int):
-        res, dim, seed = self.options
-        dim = dim_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["dimension"] = dim_
+        self.options = options_
 
     @property
     def seed(self) -> int:
@@ -689,9 +706,20 @@ class Corpus(Counter):
 
     @seed.setter
     def seed(self, seed_: int):
-        res, dim, seed = self.options
-        seed = seed_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["seed"] = seed_
+        self.options = options_
+
+    @property
+    def rmin(self) -> float:
+        """Minimum tolerable r-value for alpha/gamma fitting."""
+        return self.options.rmin
+
+    @rmin.setter
+    def rmin(self, rmin_: float):
+        options_ = dict(self.options._asdict())
+        options_["rmin"] = rmin_
+        self.options = options_
 
     @property
     def TTR(self) -> pd.DataFrame:
@@ -732,10 +760,71 @@ class Corpus(Counter):
         return self.nlegomena(5)
 
     def as_datarow(self, dim: int) -> tuple:
-        """Formats corpus metadata as (M, N, k[0], k[1], ... k[dim])"""
-        as_tuple = (self.M, self.N)
+        """Formats corpus metadata as (M, N, α, γ, k[0], k[1], ... k[dim])"""
+        as_tuple = (self.M, self.N, self.alpha, self.gamma)
         as_tuple += tuple(self.k[:dim])
         return as_tuple
+
+    def _powerlaw(self, x: np.ndarray, y: np.ndarray) -> float:
+        """
+        Calculate the power-law distribution parameter by linearly regressing log(y) ~ log(x)
+        :param x: List-like independent variable
+        :param y: List-like dependent variable
+        :param rmin: (optional) Minimum tolerable r-value of linear fit
+        """
+
+        # regress
+        def _regress(x, y):
+            slope, intercept, rval, pval, err = linregress(x, y)
+            return slope, rval
+
+        # log of inputs
+        logx = np.log(x)
+        logy = np.log(y)
+
+        # naive fit
+        rmin = self.rmin
+        if rmin is None:
+            exponent, rval = _regress(logx, logy)
+            return exponent
+
+        # iteratively trim the fat tail
+        for ymin in np.unique(y):
+
+            # trim off the fat tail
+            greater_than = y >= ymin
+            logx_ = logx[greater_than]
+            logy_ = logy[greater_than]
+            exponent, rval = _regress(logx_, logy_)
+
+            # check convergence
+            if abs(rval) > rmin:
+                return exponent
+
+        # give up
+        return np.nan
+
+    @property
+    def alpha(self):
+        """Best-fit power-law distribution parameter for word-frequency distribution."""
+        if self._alpha is None:
+            df = self.fdist
+            alpha_ = -self._powerlaw(df.index, df.freq)
+            self._alpha = alpha_
+
+        # return
+        return self._alpha
+
+    @property
+    def gamma(self):
+        """Best-fit power-law distribution parameter for n-legomena distribution."""
+        if self._gamma is None:
+            df = self.kdf
+            gamma_ = -self._powerlaw(df.index, df.freq)
+            self._gamma = gamma_
+
+        # return
+        return self._gamma
 
     #
     def sample(self, m: int = None, x: float = None):
@@ -765,14 +854,15 @@ class Corpus(Counter):
         """
 
         # user options
-        res, dim, seed = self.options
+        res = self.options.resolution
+        dim = self.options.dimension
 
         # sample the corpus
         x_choices = (np.arange(res) + 1) / res
         TTR = [self.sample(x=x).as_datarow(dim) for x in x_choices]
 
         # save to self.TTR as dataframe
-        colnames = ["m_tokens", "n_types"]
+        colnames = ["m_tokens", "n_types", "alpha", "gamma"]
         if dim is not None:
             colnames += ["lego_" + str(x) for x in range(dim)]
         TTR = pd.DataFrame(TTR, columns=colnames)
