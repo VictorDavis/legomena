@@ -827,6 +827,39 @@ class Corpus(Counter):
         return self._gamma
 
     #
+    def entropy(self, base: int = None):
+        """Entropy content of this corpus, based on word-frequency distribution."""
+
+        # shannon entropy in nats
+        fdist_ = self.fdist
+        fdist_["prob"] = fdist_["freq"] / fdist_["freq"].sum()
+        fdist_["logp"] = np.log(fdist_["prob"])
+        fdist_["nats"] = -fdist_["prob"] * fdist_["logp"]
+        entropy_ = fdist_["nats"].sum()
+
+        # convert base
+        if base:
+            entropy_ = entropy_ / np.log(base)
+
+        # return
+        return entropy_
+
+    @property
+    def bits(self) -> float:
+        """Entropy content of this corpus in bits. Alias for corpus.entropy(base=2)"""
+        return self.entropy(base=2)
+
+    @property
+    def nats(self) -> float:
+        """Entropy content of this corpus in nats. Alias for corpus.entropy()"""
+        return self.entropy()
+
+    @property
+    def bans(self) -> float:
+        """Entropy content of this corpus in bans. Alias for corpus.entropy(base=10)"""
+        return self.entropy(base=10)
+
+    #
     def sample(self, m: int = None, x: float = None):
         """
         Samples either <m> tokens or <x> proportion of tokens and returns smaller Corpus.
