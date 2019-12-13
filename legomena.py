@@ -1,6 +1,6 @@
 # bloody dependencies
 from collections import Counter, namedtuple
-from mpmath import lerchphi
+from mpmath import lerchphi, zeta, polylog
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
@@ -70,6 +70,8 @@ class HeapsModel:
         # run model
         K, B = self.params
         n_types = K * np.power(m_tokens, B)
+
+        # roundoff
         if nearest_int:
             n_types = np.round(n_types)
 
@@ -404,6 +406,8 @@ class LogModel:
         else:
             # predicted counts
             k = N_z * k_frac
+
+            # roundoff
             if nearest_int:
                 k = np.round(k)
 
@@ -427,6 +431,151 @@ class LogModel:
         return self.fit(m_tokens, n_types).predict(m_tokens)
 
 
+class FontClosModel:
+    """
+    Types = N * (1 - Li_γ(1 - Tokens/M)/ζ(γ))
+    NOTE: Eqn (8) in https://arxiv.org/pdf/1412.4577.pdf
+    """
+
+    # params
+    FontClosParams = namedtuple("FontClosParams", ("M", "N", "gamma"))
+    _params = None
+
+    @property
+    def params(self) -> tuple:  # FontClosParams
+        assert (
+            self._params is not None
+        ), "Please use .fit(m_tokens, n_types) to fit the model."
+        return self._params
+
+    @params.setter
+    def params(self, params_: tuple):
+        self._params = self.FontClosParams(*params_)
+
+    @property
+    def M(self) -> int:
+        """Number of tokens in the corpus."""
+        return self.params.M
+
+    @property
+    def N(self) -> int:
+        """Number of types in the corpus."""
+        return self.params.N
+
+    @property
+    def gamma(self) -> int:
+        """The discrete power-law distribution parameter."""
+        return self.params.gamma
+
+    def formula(self, x: np.ndarray, gamma: float = None) -> np.ndarray:
+        """
+        Predicted number of types sampled in proportion x of corpus,
+            as a proportion of total types.
+        NOTE: Eqn (8) in https://arxiv.org/pdf/1412.4577.pdf
+        """
+        gamma = gamma or self.gamma
+        Li = self._vpolylog(gamma, 1 - x)
+        A = 1 / float(zeta(gamma).real)
+        y = 1 - A * Li
+        return y
+
+    def _vpolylog(self, s: float, z: np.ndarray) -> np.ndarray:
+        """Vectorized wrapper function for mpmath.polylog()"""
+        _polylog = lambda s, z_: float(polylog(s, z_).real)
+        return np.array([_polylog(s, z_) for z_ in z])
+
+    def fit(
+        self, m_tokens: np.ndarray, n_types: np.ndarray, M: int = None, N: int = None
+    ):
+        """
+        Uses scipy.optimize.curve_fit() to fit the model to type-token data.
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :param M: (optional) Number of tokens in the corpus, defaults to m_tokens.max()
+        :param N: (optional) Number of types in the corpus, defaults to n_types.max()
+        :returns: (self) Fitted model
+        """
+
+        # fix M, N
+        M = M or m_tokens.max()
+        N = N or n_types.max()
+
+        # initial guess
+        p0 = 2.0
+
+        # minimize MSE on random perturbations of gamma
+        xdata = np.array(m_tokens) / M
+        ydata = np.array(n_types) / N
+        [gamma_], _ = curve_fit(self.formula, xdata, ydata, p0)
+        self.params = (M, N, gamma_)
+
+        # return fitted model
+        return self
+
+    def fit_experimental(self, m_tokens: np.ndarray, n_types: np.ndarray, gamma: float):
+        """
+        Same as fit(), only this time fix gamma and vary the scaling parameters M, N.
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :param gamma: Power-law distribution parameter to fix
+        :returns: (self) Fitted model
+        """
+
+        # initial guess
+        M = m_tokens.max()
+        N = n_types.max()
+        p0 = (M, N)
+
+        # fix gamma, but fit M, N to the data
+        xdata = np.array(m_tokens)
+        ydata = np.array(n_types)
+        func = lambda m, M, N: N * self.formula(m / M, gamma)
+        [M, N], _ = curve_fit(func, xdata, ydata, p0)
+        M, N = int(M), int(N)
+        self.params = (M, N, gamma)
+
+        # return fitted model
+        return self
+
+    def predict(self, m_tokens: np.ndarray, nearest_int: bool = True) -> np.ndarray:
+        """
+        Calculate & return n_types = N * formula(m_tokens/M)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param nearest_int: (bool, True) Round predictions to the nearest integer
+        :returns: Number of types as predicted by Font-Clos model.
+        """
+
+        # allow scalar
+        return_scalar = np.isscalar(m_tokens)
+        m_tokens = np.array(m_tokens).reshape(-1)
+
+        # redirect: E(m) = N * formula(m/M)
+        n_types = self.N * self.formula(m_tokens / self.M)
+
+        # roundoff
+        if nearest_int:
+            n_types = np.round(n_types)
+
+        # allow scalar
+        if return_scalar:
+            assert len(n_types) == 1
+            n_types = float(n_types)
+
+        # return number of types
+        return n_types
+
+    def fit_predict(self, m_tokens: np.ndarray, n_types: np.ndarray) -> np.ndarray:
+        """
+        Equivalent to fit(m_tokens, n_types).predict(m_tokens)
+        :param m_tokens: Number of tokens, list-like independent variable
+        :param n_types: Number of types, list-like dependent variable
+        :returns: Number of types as predicted by Font-Clos model
+        """
+
+        # fit and predict
+        return self.fit(m_tokens, n_types).predict(m_tokens)
+
+
 class Corpus(Counter):
     """Wrapper class for bag of words text model."""
 
@@ -435,13 +584,16 @@ class Corpus(Counter):
     _TTR = None  # dataframe containing type/token counts from corpus samples
     _tokens = None  # memoized list of tokens
     _types = None  # memoized list of types
+    _alpha = None  # memoized power-law parameter of word-frequency distribution
+    _gamma = None  # memoized power-law parameter of n-legomena distribution
 
     # user options
-    UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed"))
+    UserOptions = namedtuple("UserOptions", ("resolution", "dimension", "seed", "rmin"))
     _options = UserOptions(
         resolution=100,  # number of samples to take when building a TTR curve
         dimension=7,  # vector size for holding n-legomena counts (zero-based)
         seed=None,  # random number seed for taking samples when building TTR
+        rmin=0.99,  # minimum tolerable r-value when fitting for alpha & gamma
     )
 
     @property
@@ -489,6 +641,14 @@ class Corpus(Counter):
         return karr
 
     @property
+    def kdf(self) -> pd.DataFrame:
+        """The frequency of n-legomena, as a dataframe."""
+        k = self.k
+        df = pd.DataFrame({"freq": k})
+        df = df.query("freq > 0")
+        return df
+
+    @property
     def M(self) -> int:
         """The number of tokens in the corpus."""
         m_tokens = sum(self.values())
@@ -506,10 +666,16 @@ class Corpus(Counter):
         return self._options
 
     @options.setter
-    def options(self, opt_: tuple):
-        self._options = self.UserOptions(*opt_)
+    def options(self, opt_):
+
+        # accept tuple or mapping
+        if isinstance(opt_, tuple):
+            self._options = self.UserOptions(*opt_)
+        else:
+            self._options = self.UserOptions(**opt_)
+
+        # clear properties affected by changed options
         self._TTR = None
-        self._params = None
 
     @property
     def resolution(self) -> int:
@@ -518,9 +684,9 @@ class Corpus(Counter):
 
     @resolution.setter
     def resolution(self, res_: int):
-        res, dim, seed = self.options
-        res = res_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["resolution"] = res_
+        self.options = options_
 
     @property
     def dimension(self) -> int:
@@ -529,9 +695,9 @@ class Corpus(Counter):
 
     @dimension.setter
     def dimension(self, dim_: int):
-        res, dim, seed = self.options
-        dim = dim_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["dimension"] = dim_
+        self.options = options_
 
     @property
     def seed(self) -> int:
@@ -540,9 +706,20 @@ class Corpus(Counter):
 
     @seed.setter
     def seed(self, seed_: int):
-        res, dim, seed = self.options
-        seed = seed_
-        self.options = (res, dim, seed)
+        options_ = dict(self.options._asdict())
+        options_["seed"] = seed_
+        self.options = options_
+
+    @property
+    def rmin(self) -> float:
+        """Minimum tolerable r-value for alpha/gamma fitting."""
+        return self.options.rmin
+
+    @rmin.setter
+    def rmin(self, rmin_: float):
+        options_ = dict(self.options._asdict())
+        options_["rmin"] = rmin_
+        self.options = options_
 
     @property
     def TTR(self) -> pd.DataFrame:
@@ -583,10 +760,71 @@ class Corpus(Counter):
         return self.nlegomena(5)
 
     def as_datarow(self, dim: int) -> tuple:
-        """Formats corpus metadata as (M, N, k[0], k[1], ... k[dim])"""
-        as_tuple = (self.M, self.N)
+        """Formats corpus metadata as (M, N, α, γ, k[0], k[1], ... k[dim])"""
+        as_tuple = (self.M, self.N, self.alpha, self.gamma)
         as_tuple += tuple(self.k[:dim])
         return as_tuple
+
+    def _powerlaw(self, x: np.ndarray, y: np.ndarray) -> float:
+        """
+        Calculate the power-law distribution parameter by linearly regressing log(y) ~ log(x)
+        :param x: List-like independent variable
+        :param y: List-like dependent variable
+        :param rmin: (optional) Minimum tolerable r-value of linear fit
+        """
+
+        # regress
+        def _regress(x, y):
+            slope, intercept, rval, pval, err = linregress(x, y)
+            return slope, rval
+
+        # log of inputs
+        logx = np.log(x)
+        logy = np.log(y)
+
+        # naive fit
+        rmin = self.rmin
+        if rmin is None:
+            exponent, rval = _regress(logx, logy)
+            return exponent
+
+        # iteratively trim the fat tail
+        for ymin in np.unique(y):
+
+            # trim off the fat tail
+            greater_than = y >= ymin
+            logx_ = logx[greater_than]
+            logy_ = logy[greater_than]
+            exponent, rval = _regress(logx_, logy_)
+
+            # check convergence
+            if abs(rval) > rmin:
+                return exponent
+
+        # give up
+        return np.nan
+
+    @property
+    def alpha(self):
+        """Best-fit power-law distribution parameter for word-frequency distribution."""
+        if self._alpha is None:
+            df = self.fdist
+            alpha_ = -self._powerlaw(df.index, df.freq)
+            self._alpha = alpha_
+
+        # return
+        return self._alpha
+
+    @property
+    def gamma(self):
+        """Best-fit power-law distribution parameter for n-legomena distribution."""
+        if self._gamma is None:
+            df = self.kdf
+            gamma_ = -self._powerlaw(df.index, df.freq)
+            self._gamma = gamma_
+
+        # return
+        return self._gamma
 
     #
     def sample(self, m: int = None, x: float = None):
@@ -616,14 +854,15 @@ class Corpus(Counter):
         """
 
         # user options
-        res, dim, seed = self.options
+        res = self.options.resolution
+        dim = self.options.dimension
 
         # sample the corpus
         x_choices = (np.arange(res) + 1) / res
         TTR = [self.sample(x=x).as_datarow(dim) for x in x_choices]
 
         # save to self.TTR as dataframe
-        colnames = ["m_tokens", "n_types"]
+        colnames = ["m_tokens", "n_types", "alpha", "gamma"]
         if dim is not None:
             colnames += ["lego_" + str(x) for x in range(dim)]
         TTR = pd.DataFrame(TTR, columns=colnames)
@@ -667,6 +906,8 @@ class InfSeriesModel:
         terms = np.array([np.power(1 - x, n) for n in exponents])
         k_0 = np.dot(self.k, terms)
         n_types = self.N - k_0
+
+        # roundoff
         if nearest_int:
             n_types = np.round(n_types)
 

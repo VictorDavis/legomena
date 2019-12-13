@@ -1,6 +1,6 @@
 # Legomena
 
-Tool for exploring types, tokens, and n-legomena relationships in text. Based on [Davis 2019](https://arxiv.org/pdf/1901.00521.pdf) [1] research paper.
+Tool for exploring types, tokens, and n-legomena relationships in text. Based on [Davis 2019] research paper.
 
 [![Testing Status](https://github.com/VictorDavis/legomena/workflows/tests/badge.svg)](https://github.com/VictorDavis/legomena/actions)
 
@@ -75,8 +75,9 @@ There are a variety of models in the literature predicting number of types as a 
 ```
 # three models
 model = HeapsModel()  # Heap's Law
-model = InfSeriesModel(corpus)  # Infinite Series Model [1]
-model = LogModel()  # Logarithmic Model [1]
+model = InfSeriesModel(corpus)  # Infinite Series Model [Davis 2019]
+model = LogModel()  # Logarithmic Model [Davis 2019]
+model = FontClosModel  # Font-Clos Model [Font-Clos 2018]
 
 # model fitting
 m_tokens = corpus.TTR.m_tokens
@@ -98,3 +99,6 @@ predicted_k = model.predict_k(m_tokens, dim)
 ## Demo App
 
 Check out the [demo app](http://legomena.herokuapp.com/) to explore the type-token and n-legomena counts of a few Project Gutenberg books.
+
+[Davis 2019]: (https://arxiv.org/pdf/1901.00521.pdf)
+[Font-Clos 2018]: (https://arxiv.org/pdf/1412.4577.pdf)
