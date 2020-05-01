@@ -634,6 +634,10 @@ class Corpus(Counter):
         if self._k is None:
             self._k = Counter(self.values())
 
+        # no tokens
+        if len(self._k) == 0:
+            return np.array([])
+
         # return as array
         k = self._k
         kmax = max(k.keys())
