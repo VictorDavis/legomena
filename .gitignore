@@ -13,3 +13,6 @@ data/SPGC-counts-2018-07-18/*
 # distro files
 dist/
 legomena.egg-info/
+
+# mac dross
+.DS_Store
