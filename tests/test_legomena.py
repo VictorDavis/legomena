@@ -1,7 +1,4 @@
 # bloody dependencies
-import nltk
-
-nltk.download("gutenberg")
 from nltk.corpus import gutenberg
 import numpy as np
 import pandas as pd
@@ -13,6 +10,7 @@ from legomena import Corpus, HeapsModel, LogModel, InfSeriesModel, FontClosModel
 # globals
 GRAPHICS_ON = False
 SEED = 42
+
 
 # standard error
 def std_err(y, y_hat):
