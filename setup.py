@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 setup(
     name="legomena",
     version="1.2.0",
-    description="Tool for exploring types, tokens, and n-legomena relationships in text.",
+    description="Tool for exploring types, tokens, and n-legomena relationships",
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",

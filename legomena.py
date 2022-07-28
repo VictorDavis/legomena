@@ -4,7 +4,6 @@ from mpmath import lerchphi, zeta, polylog
 import numpy as np
 import pandas as pd
 from scipy.optimize import fsolve, curve_fit
-from scipy.special import comb as nCr
 from scipy.stats import linregress
 
 
@@ -208,10 +207,11 @@ class LogModel:
         Predicted number of n-legomena when sampling proportion x of corpus,
             as a proportion of total types.
 
-        NOTE: Unpublished generalization of eqns (17.*) in https://arxiv.org/pdf/1901.00521.pdf
+        NOTE: Unpublished generalization of eqns (17.*)
+              from https://arxiv.org/pdf/1901.00521.pdf
         $$
-        \hat{k}_0(x) = 1 - \phi\bigg(\frac{x-1}{x}, 1, n+1\bigg) \\
-        \hat{k}_n(x) = \frac{1}{n} - \frac{1}{x}\phi\bigg(\frac{x-1}{x}, 1, n+1\bigg)
+        \\hat{k}_0(x) = 1 - \\phi\bigg(\frac{x-1}{x}, 1, n+1\bigg) \\
+        \\hat{k}_n(x) = \frac{1}{n} - \frac{1}{x}\\phi\bigg(\frac{x-1}{x}, 1, n+1\bigg)
         $$
         """
 
@@ -300,7 +300,8 @@ class LogModel:
 
     def fit_naive(self, m_tokens: int, n_types: int, h_hapax: int):
         """
-        Uses observed whole-corpus hapax:type ratio to infer M_z, N_z optimum sample size.
+        Uses observed corpus hapax:type ratio to infer M_z, N_z optimum sample size.
+
         :param m_tokens: (int, scalar) Number of tokens in the corpus.
         :param n_types: (int, scalar) Number of types in the corpus.
         :param h_hapax: (int, scalar) Number of hapax in the corpus.
@@ -309,7 +310,10 @@ class LogModel:
 
         # infer z from h_obs
         h_obs = h_hapax / n_types  # observed hapax proportion
-        func = lambda x: 1.0 / np.log(x) + 1.0 / (1.0 - x) - h_obs
+
+        def func(x):
+            return 1.0 / np.log(x) + 1.0 / (1.0 - x) - h_obs
+
         z0 = 0.5
         z = fsolve(func, z0)[0]
         M_z = m_tokens / z
@@ -334,7 +338,9 @@ class LogModel:
 
         # minimize MSE on random perturbations of M_z, N_z
         # NOTE: y(x) = 1 - k0(x) -> E(m)/Nz = 1 - k0(m/Mz)
-        func = lambda m, M_z, N_z: N_z * (1 - self.formula_0(m / M_z))
+        def func(m, M_z, N_z):
+            return N_z * (1 - self.formula_0(m / M_z))
+
         xdata = np.array(m_tokens)
         ydata = np.array(n_types)
         params_, _ = curve_fit(func, xdata, ydata, p0)
@@ -481,7 +487,10 @@ class FontClosModel:
 
     def _vpolylog(self, s: float, z: np.ndarray) -> np.ndarray:
         """Vectorized wrapper function for mpmath.polylog()"""
-        _polylog = lambda s, z_: float(polylog(s, z_).real)
+
+        def _polylog(s, z_):
+            return float(polylog(s, z_).real)
+
         return np.array([_polylog(s, z_) for z_ in z])
 
     def fit(
@@ -529,7 +538,10 @@ class FontClosModel:
         # fix gamma, but fit M, N to the data
         xdata = np.array(m_tokens)
         ydata = np.array(n_types)
-        func = lambda m, M, N: N * self.formula(m / M, gamma)
+
+        def func(m, M, N):
+            return N * self.formula(m / M, gamma)
+
         [M, N], _ = curve_fit(func, xdata, ydata, p0)
         M, N = int(M), int(N)
         self.params = (M, N, gamma)
@@ -690,7 +702,10 @@ class Corpus(Counter):
 
     @property
     def dimension(self) -> int:
-        """The desired dimension of the problem, include n-legomena counts for n = 0 to dim-1."""
+        """
+        The desired dimension of the problem,
+        include n-legomena counts for n = 0 to dim-1.
+        """
         return self.options.dimension
 
     @dimension.setter
@@ -767,7 +782,9 @@ class Corpus(Counter):
 
     def _powerlaw(self, x: np.ndarray, y: np.ndarray) -> float:
         """
-        Calculate the power-law distribution parameter by linearly regressing log(y) ~ log(x)
+        Calculate the power-law distribution parameter
+        by linearly regressing log(y) ~ log(x)
+
         :param x: List-like independent variable
         :param y: List-like dependent variable
         :param rmin: (optional) Minimum tolerable r-value of linear fit
@@ -862,7 +879,7 @@ class Corpus(Counter):
     #
     def sample(self, m: int = None, x: float = None):
         """
-        Samples either <m> tokens or <x> proportion of tokens and returns smaller Corpus.
+        Samples either <m> tokens or <x> proportion of tokens and returns smaller Corpus
         :param m: (int) Number of tokens to sample *without replacement*. (m <= M)
         :param x: (float) Proportion of corpus to sample. (x <= 1)
         :returns: Corpus composed of sampled tokens.
@@ -881,7 +898,7 @@ class Corpus(Counter):
     #
     def _compute_TTR(self) -> pd.DataFrame:
         """
-        Samples the corpus at intervals 1/res, 2/res, ... 1 to build a Type-Token Relation
+        Samples the corpus at intervals 1/res, 2/res,...1 to build a Type-Token Relation
         curve consisting of <resolution> points <(m, n)>
         :returns: Dataframe of token/type/legomena counts
         """

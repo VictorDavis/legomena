@@ -121,8 +121,12 @@ class LegomenaTest(unittest.TestCase):
         assert corpus.sample(99).M == 99
         assert corpus.sample(x=0).M == 0
         assert corpus.sample(x=1).M == corpus.M
-        with self.assertRaises(Exception) as context:
-            corpus.sample(x=1.5)  # can't over sample with replace=False
+
+        # can't over sample with replace=False
+        with self.assertRaises(ValueError) as context:
+            corpus.sample(x=1.5)
+        expected = "Cannot take a larger sample than population when 'replace=False'"
+        assert context.exception == expected
 
     # compare models on SPGC and NLTK data
     def test_spgc_nltk(self):
@@ -218,26 +222,26 @@ class LegomenaTest(unittest.TestCase):
         # fit Heap's Law model to TTR curve
         hmodel = HeapsModel().fit(m_tokens, n_types)
         predictions_heaps = hmodel.predict(m_tokens)
-        H = hmodel.predict(1000)
+        hmodel_prediction = hmodel.predict(1000)
+        assert hmodel_prediction == 756
 
         # infinite series
         imodel = InfSeriesModel(corpus)
         predictions_iseries = imodel.predict(m_tokens)
-        I = imodel.predict(1000)
+        imodel_predition = imodel.predict(1000)
+        assert imodel_predition == 513
 
         # fit logarithmic model to TTR curve
         lmodel = LogModel().fit(m_tokens, n_types)
         predictions_log = lmodel.predict(m_tokens)
-        L = lmodel.predict(1000)
+        lmodel_prediction = lmodel.predict(1000)
+        assert lmodel_prediction == 515
 
         # fit Font-Clos model to TTR curve
-        M, N = corpus.M, corpus.N
         fmodel = FontClosModel().fit(m_tokens, n_types)
         predictions_fontclos = lmodel.predict(m_tokens)
-        F = fmodel.predict(1000)
-
-        # explicit check
-        assert (H, I, L, F) == (756, 513, 515, 770)
+        fmodel_prediction = fmodel.predict(1000)
+        assert fmodel_prediction == 770
 
         # draw pretty pictures
         if GRAPHICS_ON:
@@ -492,7 +496,7 @@ class LegomenaTest(unittest.TestCase):
         x = np.array([1 - eps, 1 + eps])
 
         # explicit formulas
-        explicit_delta0 = abs(model.formula_0(x) - k0_)
+        # explicit_delta0 = abs(model.formula_0(x) - k0_)
         explicit_delta1 = abs(model.formula_1(x) - k1_)
         explicit_delta2 = abs(model.formula_2(x) - k2_)
         explicit_delta3 = abs(model.formula_3(x) - k3_)
@@ -555,7 +559,7 @@ class LegomenaTest(unittest.TestCase):
 
         # predict E(M) & k_n(M)
         model.dimension = dim
-        E_m = model.predict(corpus.M)
+        # E_m = model.predict(corpus.M)
         k = model.predict_k(corpus.M, dim)
         assert len(k) == dim
         err = std_err(corpus.k[:dim], k)
@@ -592,7 +596,6 @@ class LegomenaTest(unittest.TestCase):
             rmse_log = RMSE_pct(n_types, predictions_log)
 
             # Font-Clos model
-            M, N = corpus.M, corpus.N
             fmodel = FontClosModel()
             predictions_fontclos = fmodel.fit_predict(m_tokens, n_types)
             rmse_fontclos = RMSE_pct(n_types, predictions_fontclos)
