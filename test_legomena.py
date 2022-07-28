@@ -103,8 +103,8 @@ class LegomenaTest(unittest.TestCase):
         assert sum(corpus.k) == corpus.N
         assert len(corpus.types) == corpus.N
         assert corpus.WFD.equals(corpus.fdist)
-        assert corpus.alpha == 0.9196082282619522
-        assert corpus.gamma == 1.7739943128244318
+        assert round(corpus.alpha, 6) == 0.919608
+        assert round(corpus.gamma, 6) == 1.773994
         assert corpus.as_datarow(7) == (
             8354,
             1820,
