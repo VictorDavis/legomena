@@ -142,8 +142,8 @@ class LogModel:
         NOTE: Eqn 17.1 in https://arxiv.org/pdf/1901.00521.pdf
         """
         logx = np.log(x)
-        x2 = x ** 2
-        denom = (x - 1) ** 2
+        x2 = np.power(x, 2)
+        denom = np.power((x - 1), 2)
         k1 = (x2 - logx * x - x) / denom
         return k1
 
@@ -155,8 +155,8 @@ class LogModel:
         NOTE: Eqn 17.2 in https://arxiv.org/pdf/1901.00521.pdf
         """
         logx = np.log(x)
-        x2, x3 = x ** 2, x ** 3
-        denom = 2 * (x - 1) ** 3
+        x2, x3 = np.power(x, 2), np.power(x, 3)
+        denom = 2 * np.power((x - 1), 3)
         k2 = (x3 - 2 * logx * x2 - x) / denom
         return k2
 
@@ -168,8 +168,8 @@ class LogModel:
         NOTE: Eqn 17.3 in https://arxiv.org/pdf/1901.00521.pdf
         """
         logx = np.log(x)
-        x2, x3, x4 = x ** 2, x ** 3, x ** 4
-        denom = 6 * (x - 1) ** 4
+        x2, x3, x4 = np.power(x, 2), np.power(x, 3), np.power(x, 4)
+        denom = 6 * np.power((x - 1), 4)
         k3 = (2 * x4 - 6 * logx * x3 + 3 * x3 - 6 * x2 + x) / denom
         return k3
 
@@ -181,8 +181,8 @@ class LogModel:
         NOTE: Eqn 17.4 in https://arxiv.org/pdf/1901.00521.pdf
         """
         logx = np.log(x)
-        x2, x3, x4, x5 = x ** 2, x ** 3, x ** 4, x ** 5
-        denom = 12 * (x - 1) ** 5
+        x2, x3, x4, x5 = np.power(x, 2), np.power(x, 3), np.power(x, 4), np.power(x, 5)
+        denom = 12 * np.power((x - 1), 5)
         k4 = (3 * x5 - 12 * logx * x4 + 10 * x4 - 18 * x3 + 6 * x2 - x) / denom
         return k4
 
@@ -194,11 +194,17 @@ class LogModel:
         NOTE: Eqn 17.5 in https://arxiv.org/pdf/1901.00521.pdf
         """
         logx = np.log(x)
-        x2, x3, x4, x5, x6 = x ** 2, x ** 3, x ** 4, x ** 5, x ** 6
+        x2, x3, x4, x5, x6 = (
+            np.power(x, 2),
+            np.power(x, 3),
+            np.power(x, 4),
+            np.power(x, 5),
+            np.power(x, 6),
+        )
         k5 = (
             (12 * x6 - 60 * logx * x5 + 65 * x5 - 120 * x4 + 60 * x3 - 20 * x2 + 3 * x)
             / 60
-            / (x - 1) ** 6
+            / np.power((x - 1), 6)
         )
         return k5
 
