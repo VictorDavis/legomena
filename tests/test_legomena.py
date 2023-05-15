@@ -126,7 +126,7 @@ class LegomenaTest(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             corpus.sample(x=1.5)
         expected = "Cannot take a larger sample than population when 'replace=False'"
-        assert context.exception == expected
+        assert str(context.exception) == expected
 
     # compare models on SPGC and NLTK data
     def test_spgc_nltk(self):
