@@ -29,7 +29,6 @@ def RMSE_pct(y, y_hat):
 
 
 def spgc_read(fileid):
-
     # open file
     fname = "data/SPGC-counts-2018-07-18/%s" % fileid
     with open(fname) as f:
@@ -42,7 +41,6 @@ def spgc_read(fileid):
 
 
 def get_books():
-
     # NLTK-SPGC lookup
     books = pd.DataFrame(
         [
@@ -74,10 +72,8 @@ def get_books():
 
 # unit tests
 class LegomenaTest(unittest.TestCase):
-
     # initialize Legomena class with small corpus & assert simple stats match
     def test_basic(self):
-
         # retrieve corpus from NLTK
         filename = "blake-poems.txt"
         words = gutenberg.words(filename)
@@ -130,7 +126,6 @@ class LegomenaTest(unittest.TestCase):
 
     # compare models on SPGC and NLTK data
     def test_spgc_nltk(self):
-
         # NLTK-SPGC lookup
         books = get_books()
 
@@ -208,7 +203,6 @@ class LegomenaTest(unittest.TestCase):
 
     # model-fitting tests
     def test_models(self):
-
         # initialize class
         wfd = spgc_read("PG2701_counts.txt")  # moby dick
         corpus = Corpus(wfd)
@@ -291,7 +285,6 @@ class LegomenaTest(unittest.TestCase):
 
     # functions for finding optimum sample size M_z, N_z
     def test_optimization(self):
-
         # retrieve corpus from NLTK
         filename = "melville-moby_dick.txt"
         words = gutenberg.words(filename)
@@ -364,7 +357,6 @@ class LegomenaTest(unittest.TestCase):
 
     # enforce random seed behavior
     def test_random_seed(self):
-
         # retrieve corpus from NLTK
         filename = "blake-poems.txt"
         words = gutenberg.words(filename)
@@ -413,7 +405,6 @@ class LegomenaTest(unittest.TestCase):
 
     # generalized formula matches explicit formula
     def test_generalized(self):
-
         # apply both formulas to random selection of x values
         model = LogModel()
         np.random.seed(SEED)
@@ -445,7 +436,6 @@ class LegomenaTest(unittest.TestCase):
 
     # generalized formula contains no singularities
     def test_singularities(self):
-
         # singularity @ x=0
         model = LogModel()
 
@@ -536,7 +526,6 @@ class LegomenaTest(unittest.TestCase):
 
     # check model k_n predictions for n > 5
     def test_high_dimensions(self):
-
         # retrieve corpus from NLTK
         filename = "melville-moby_dick.txt"
         words = gutenberg.words(filename)
@@ -576,7 +565,6 @@ class LegomenaTest(unittest.TestCase):
 
     # compare Font-Clos versus logarithmic model on SPGC data
     def test_fontclos(self):
-
         # loop over SPGC books
         results = []
         books = get_books()

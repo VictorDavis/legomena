@@ -685,7 +685,6 @@ class Corpus(Counter):
 
     @options.setter
     def options(self, opt_):
-
         # accept tuple or mapping
         if isinstance(opt_, tuple):
             self._options = self.UserOptions(*opt_)
@@ -813,7 +812,6 @@ class Corpus(Counter):
 
         # iteratively trim the fat tail
         for ymin in np.unique(y):
-
             # trim off the fat tail
             greater_than = y >= ymin
             logx_ = logx[greater_than]
